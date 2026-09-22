@@ -36,6 +36,7 @@ GROUP BY ?item ?itemLabel ?coord ?image ?commons ?viTitle
 
 def parse_bindings(bindings: list[dict]) -> list[PlaceRecord]:
     places = []
+    seen_qids: set[str] = set()
     for row in bindings:
         coord = row.get("coord", {}).get("value", "")
         match = POINT_RE.match(coord)
@@ -43,7 +44,14 @@ def parse_bindings(bindings: list[dict]) -> list[PlaceRecord]:
             continue
         lon, lat = float(match.group(1)), float(match.group(2))
         qid = row["item"]["value"].rsplit("/", 1)[-1]
-        classes = [c for c in row.get("classes", {}).get("value", "").split("|") if c]
+        if qid in seen_qids:
+            continue
+        seen_qids.add(qid)
+        classes = [
+            c.rsplit("/", 1)[-1]
+            for c in row.get("classes", {}).get("value", "").split("|")
+            if c
+        ]
 
         tags: dict[str, str] = {}
         if row.get("commons"):

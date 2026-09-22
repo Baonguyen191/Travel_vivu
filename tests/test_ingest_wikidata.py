@@ -28,3 +28,50 @@ def test_parse_bindings_skips_rows_without_coordinates():
          "itemLabel": {"value": "Không tọa độ"}},
     ]
     assert parse_bindings(bindings) == []
+
+
+def test_parse_bindings_strips_uri_prefix_from_classes():
+    bindings = [
+        {
+            "item": {"value": "http://www.wikidata.org/entity/Q1"},
+            "itemLabel": {"value": "A"},
+            "coord": {"value": "Point(107.0 16.0)"},
+            "classes": {
+                "value": "http://www.wikidata.org/entity/Q16970"
+                "|http://www.wikidata.org/entity/Q33506"
+            },
+        }
+    ]
+    [place] = parse_bindings(bindings)
+    assert place.wikidata_classes == ["Q16970", "Q33506"]
+
+
+def test_parse_bindings_keeps_bare_qid_classes_unchanged():
+    bindings = [
+        {
+            "item": {"value": "http://www.wikidata.org/entity/Q1"},
+            "itemLabel": {"value": "A"},
+            "coord": {"value": "Point(107.0 16.0)"},
+            "classes": {"value": "Q16970|Q33506"},
+        }
+    ]
+    [place] = parse_bindings(bindings)
+    assert place.wikidata_classes == ["Q16970", "Q33506"]
+
+
+def test_parse_bindings_dedupes_by_qid_keeping_first_coordinates():
+    bindings = [
+        {
+            "item": {"value": "http://www.wikidata.org/entity/Q1"},
+            "itemLabel": {"value": "A"},
+            "coord": {"value": "Point(107.0 16.0)"},
+        },
+        {
+            "item": {"value": "http://www.wikidata.org/entity/Q1"},
+            "itemLabel": {"value": "A"},
+            "coord": {"value": "Point(108.0 17.0)"},
+        },
+    ]
+    places = parse_bindings(bindings)
+    assert len(places) == 1
+    assert (places[0].lon, places[0].lat) == (107.0, 16.0)
