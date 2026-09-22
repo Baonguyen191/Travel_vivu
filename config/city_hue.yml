@@ -1,0 +1,8 @@
+name: Huế
+# bbox quanh lõi đô thị, không phải toàn thành phố trực thuộc trung ương.
+# Thứ tự: south, west, north, east
+bbox: [16.335, 107.435, 16.605, 107.725]
+# Kinh thành Huế
+core_center: [16.4698, 107.5796]
+core_radius_km: 15
+polygon_wkt: null
