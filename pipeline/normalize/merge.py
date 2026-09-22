@@ -50,24 +50,33 @@ def merge_places(
 
     for wd in wikidata:
         wd_key = normalize_name(wd.name)
-        pair_index = None
+        same_name_candidates = []  # (distance, osm_index)
         for i, candidate in enumerate(osm):
             if i in used_osm:
                 continue
+            if normalize_name(candidate.name) != wd_key:
+                continue
             distance = haversine_m(wd.lat, wd.lon, candidate.lat, candidate.lon)
-            same_name = normalize_name(candidate.name) == wd_key
-            if distance < MATCH_RADIUS_M and same_name:
-                pair_index = i
-                break
-            if same_name:
-                review.append({
-                    "wikidata_id": wd.external_ids.get("wikidata", ""),
-                    "osm_id": candidate.external_ids.get("osm", ""),
-                    "wikidata_name": wd.name,
-                    "osm_name": candidate.name,
-                    "distance_m": round(distance, 1),
-                    "reason": "trung_ten_nhung_xa",
-                })
+            same_name_candidates.append((distance, i))
+
+        same_name_candidates.sort(key=lambda pair: pair[0])
+
+        pair_index = None
+        if same_name_candidates and same_name_candidates[0][0] < MATCH_RADIUS_M:
+            pair_index = same_name_candidates[0][1]
+
+        for distance, i in same_name_candidates:
+            if i == pair_index:
+                continue
+            candidate = osm[i]
+            review.append({
+                "wikidata_id": wd.external_ids.get("wikidata", ""),
+                "osm_id": candidate.external_ids.get("osm", ""),
+                "wikidata_name": wd.name,
+                "osm_name": candidate.name,
+                "distance_m": round(distance, 1),
+                "reason": "trung_ten_nhung_xa",
+            })
 
         if pair_index is None:
             merged.append(wd)
@@ -80,7 +89,7 @@ def merge_places(
             external_ids={**wd.external_ids, **partner.external_ids},
             opening_hours_raw=partner.opening_hours_raw or wd.opening_hours_raw,
             website=partner.website or wd.website,
-            tags={**partner.tags, **wd.tags},
+            tags={**wd.tags, **partner.tags},
         ))
 
     merged.extend(p for i, p in enumerate(osm) if i not in used_osm)

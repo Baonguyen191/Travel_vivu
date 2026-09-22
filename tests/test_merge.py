@@ -58,3 +58,42 @@ def test_same_name_far_apart_goes_to_review():
     merged, review = merge_places([wd], [osm])
     assert len(merged) == 2
     assert review[0]["reason"] == "trung_ten_nhung_xa"
+
+
+def test_merge_picks_nearest_same_name_candidate_regardless_of_input_order():
+    wd = PlaceRecord("Lăng Tự Đức", {"wikidata": "Q1"}, 16.4325, 107.5660)
+    close = PlaceRecord("Lăng Tự Đức", {"osm": "relation/close"}, 16.4329409, 107.5655529)
+    far = PlaceRecord("Lăng Tự Đức", {"osm": "node/far"}, 16.4331813, 107.5645857)
+
+    for osm_records in ([close, far], [far, close]):
+        merged, review = merge_places([wd], osm_records)
+        [wikidata_place] = [p for p in merged if "wikidata" in p.external_ids]
+        assert wikidata_place.external_ids["osm"] == "relation/close"
+        assert len(review) == 1
+        assert review[0]["osm_id"] == "node/far"
+        assert review[0]["reason"] == "trung_ten_nhung_xa"
+
+
+def test_merge_with_three_same_name_candidates_merges_nearest_reviews_rest():
+    wd = PlaceRecord("Lăng Khải Định", {"wikidata": "Q1"}, 16.4325, 107.5660)
+    near = PlaceRecord("Lăng Khải Định", {"osm": "node/near"}, 16.4326, 107.5661)
+    mid = PlaceRecord("Lăng Khải Định", {"osm": "node/mid"}, 16.4330, 107.5670)
+    far = PlaceRecord("Lăng Khải Định", {"osm": "node/far"}, 16.4400, 107.5800)
+
+    merged, review = merge_places([wd], [near, mid, far])
+    [wikidata_place] = [p for p in merged if "wikidata" in p.external_ids]
+    assert wikidata_place.external_ids["osm"] == "node/near"
+    assert {row["osm_id"] for row in review} == {"node/mid", "node/far"}
+    assert all(row["reason"] == "trung_ten_nhung_xa" for row in review)
+
+
+def test_merge_tags_union_with_osm_precedence_on_conflict():
+    wd = PlaceRecord("Chùa Thiên Mụ", {"wikidata": "Q1"}, 16.4539, 107.5453,
+                     tags={"vi_title": "Chùa Thiên Mụ", "wikidata": "Q1"})
+    osm = PlaceRecord("Chùa Thiên Mụ", {"osm": "way/9"}, 16.4540, 107.5454,
+                      tags={"wikidata": "Q1-from-osm", "historic": "temple"})
+    merged, review = merge_places([wd], [osm])
+    [place] = merged
+    assert place.tags["vi_title"] == "Chùa Thiên Mụ"
+    assert place.tags["historic"] == "temple"
+    assert place.tags["wikidata"] == "Q1-from-osm"
