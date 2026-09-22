@@ -44,46 +44,47 @@ def within_core(place: PlaceRecord, cfg: CityConfig) -> bool:
 def merge_places(
     wikidata: list[PlaceRecord], osm: list[PlaceRecord]
 ) -> tuple[list[PlaceRecord], list[dict]]:
-    merged: list[PlaceRecord] = []
-    review: list[dict] = []
-    used_osm: set[int] = set()
-
-    for wd in wikidata:
+    # Every (Wikidata, OSM) pair whose normalized names match, whatever the
+    # distance. This is the full pool a review row can be drawn from.
+    same_name_pairs: list[tuple[float, int, int]] = []  # (distance, wd_index, osm_index)
+    for wi, wd in enumerate(wikidata):
         wd_key = normalize_name(wd.name)
-        same_name_candidates = []  # (distance, osm_index)
-        for i, candidate in enumerate(osm):
-            if i in used_osm:
-                continue
+        for oi, candidate in enumerate(osm):
             if normalize_name(candidate.name) != wd_key:
                 continue
             distance = haversine_m(wd.lat, wd.lon, candidate.lat, candidate.lon)
-            same_name_candidates.append((distance, i))
+            same_name_pairs.append((distance, wi, oi))
 
-        same_name_candidates.sort(key=lambda pair: pair[0])
+    # Global assignment: among same-name pairs under the radius, accept the
+    # closest first and skip any pair whose Wikidata or OSM side is already
+    # taken. The distance/id-based sort key depends only on record content,
+    # not on input list position, so the assignment is independent of how
+    # `wikidata` or `osm` were ordered or shuffled.
+    def match_sort_key(pair: tuple[float, int, int]) -> tuple[float, str, str]:
+        distance, wi, oi = pair
+        wd_id = wikidata[wi].external_ids.get("wikidata", "")
+        osm_id = osm[oi].external_ids.get("osm", "")
+        return (distance, wd_id, osm_id)
 
-        pair_index = None
-        if same_name_candidates and same_name_candidates[0][0] < MATCH_RADIUS_M:
-            pair_index = same_name_candidates[0][1]
+    match_candidates = sorted(
+        (pair for pair in same_name_pairs if pair[0] < MATCH_RADIUS_M),
+        key=match_sort_key,
+    )
 
-        for distance, i in same_name_candidates:
-            if i == pair_index:
-                continue
-            candidate = osm[i]
-            review.append({
-                "wikidata_id": wd.external_ids.get("wikidata", ""),
-                "osm_id": candidate.external_ids.get("osm", ""),
-                "wikidata_name": wd.name,
-                "osm_name": candidate.name,
-                "distance_m": round(distance, 1),
-                "reason": "trung_ten_nhung_xa",
-            })
+    matched_wd: dict[int, int] = {}
+    matched_osm: dict[int, int] = {}
+    for _distance, wi, oi in match_candidates:
+        if wi in matched_wd or oi in matched_osm:
+            continue
+        matched_wd[wi] = oi
+        matched_osm[oi] = wi
 
-        if pair_index is None:
+    merged: list[PlaceRecord] = []
+    for wi, wd in enumerate(wikidata):
+        if wi not in matched_wd:
             merged.append(wd)
             continue
-
-        partner = osm[pair_index]
-        used_osm.add(pair_index)
+        partner = osm[matched_wd[wi]]
         merged.append(replace(
             wd,
             external_ids={**wd.external_ids, **partner.external_ids},
@@ -91,6 +92,23 @@ def merge_places(
             website=partner.website or wd.website,
             tags={**wd.tags, **partner.tags},
         ))
+    merged.extend(candidate for oi, candidate in enumerate(osm) if oi not in matched_osm)
+    merged.sort(key=lambda place: place.place_key)
 
-    merged.extend(p for i, p in enumerate(osm) if i not in used_osm)
+    review: list[dict] = []
+    for distance, wi, oi in same_name_pairs:
+        if matched_wd.get(wi) == oi:
+            continue
+        wd = wikidata[wi]
+        candidate = osm[oi]
+        review.append({
+            "wikidata_id": wd.external_ids.get("wikidata", ""),
+            "osm_id": candidate.external_ids.get("osm", ""),
+            "wikidata_name": wd.name,
+            "osm_name": candidate.name,
+            "distance_m": round(distance, 1),
+            "reason": "trung_ten_nhung_xa",
+        })
+    review.sort(key=lambda row: (row["wikidata_id"], row["osm_id"]))
+
     return merged, review

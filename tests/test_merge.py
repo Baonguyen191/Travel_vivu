@@ -97,3 +97,35 @@ def test_merge_tags_union_with_osm_precedence_on_conflict():
     assert place.tags["vi_title"] == "Chùa Thiên Mụ"
     assert place.tags["historic"] == "temple"
     assert place.tags["wikidata"] == "Q1-from-osm"
+
+
+def test_two_wikidata_records_competing_for_one_osm_candidate_pick_nearer_regardless_of_order():
+    osm_place = PlaceRecord("Lăng Khải Định", {"osm": "node/shared"}, 16.4325, 107.5660)
+    near_wd = PlaceRecord("Lăng Khải Định", {"wikidata": "Qnear"}, 16.43260, 107.56610)
+    far_wd = PlaceRecord("Lăng Khải Định", {"wikidata": "Qfar"}, 16.43320, 107.56680)
+
+    for wikidata_order in ([near_wd, far_wd], [far_wd, near_wd]):
+        merged, review = merge_places(wikidata_order, [osm_place])
+        merged_pair = [p for p in merged if p.external_ids.get("osm") == "node/shared"]
+        assert len(merged_pair) == 1
+        assert merged_pair[0].external_ids["wikidata"] == "Qnear"
+        assert len(review) == 1
+        assert review[0]["wikidata_id"] == "Qfar"
+        assert review[0]["osm_id"] == "node/shared"
+
+
+def test_shuffled_input_produces_identical_merged_output_and_review_rows():
+    wd_thien_mu = PlaceRecord("Chùa Thiên Mụ", {"wikidata": "Q1"}, 16.4539, 107.5453,
+                               wikidata_classes=["Q16970"])
+    wd_dong_ba = PlaceRecord("Chợ Đông Ba", {"wikidata": "Q2"}, 16.4700, 107.5800)
+    osm_thien_mu = PlaceRecord("Chùa Thiên Mụ", {"osm": "way/9"}, 16.4540, 107.5454,
+                                opening_hours_raw="Mo-Su 07:00-17:00")
+    osm_dong_ba = PlaceRecord("Chợ Đông Ba", {"osm": "node/9"}, 16.5200, 107.6200)
+
+    merged_a, review_a = merge_places(
+        [wd_thien_mu, wd_dong_ba], [osm_thien_mu, osm_dong_ba])
+    merged_b, review_b = merge_places(
+        [wd_dong_ba, wd_thien_mu], [osm_dong_ba, osm_thien_mu])
+
+    assert merged_a == merged_b
+    assert review_a == review_b
