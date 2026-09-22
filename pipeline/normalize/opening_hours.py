@@ -43,13 +43,22 @@ def parse_opening_hours(raw: str | None) -> dict | None:
     if text == "24/7":
         return {d: [["00:00", "24:00"]] for d in DAYS}
 
+    clauses = [c.strip() for c in text.split(";")]
+    clauses = [c for c in clauses if c]
+    if not clauses:
+        return None
+    clause_parts = [c.split(None, 1) for c in clauses]
+
+    # Quy tắc không kèm phần ngày chỉ được coi là "áp dụng cả tuần" khi nó
+    # là quy tắc duy nhất trong chuỗi. Nếu chuỗi có nhiều quy tắc và một
+    # quy tắc thiếu phần ngày, ý định mơ hồ (có thể là quên dấu phẩy nối
+    # thêm dải giờ vào quy tắc trước) nên từ chối toàn bộ chuỗi.
+    if len(clauses) > 1 and any(len(p) == 1 for p in clause_parts):
+        return None
+
     result: dict[str, list[list[str]]] = {d: [] for d in DAYS}
     matched_any_rule = False
-    for rule in text.split(";"):
-        rule = rule.strip()
-        if not rule:
-            continue
-        parts = rule.split(None, 1)
+    for parts in clause_parts:
         if len(parts) == 1:
             # Không có phần ngày: quy tắc chỉ gồm dải giờ, áp dụng mọi ngày.
             intervals = _parse_intervals(parts[0])
