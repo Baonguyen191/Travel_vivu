@@ -20,11 +20,17 @@ wikidata:
   Q12280: diem_tham_quan       # bridge / cầu (vd. Cầu Trường Tiền)
   Q381885: lang_tam            # tomb / lăng mộ
   Q162875: lang_tam            # mausoleum / lăng
-  Q41176: di_tich               # building / công trình (trong hoàng thành, lăng tẩm)
+  Q41176: di_tich               # building / công trình — class chung chung; map di_tich
+                                 # dựa trên các bản ghi staged hiện tại (đều nằm trong
+                                 # hoàng thành/lăng tẩm), KHÔNG an toàn cho mọi "building"
+                                 # nói chung — kiểm tra lại nếu refresh dữ liệu
   Q276173: di_tich              # pavilion / lầu, đình
   Q16560: di_tich               # palace / cung điện
   Q53060: di_tich               # gate / cổng (vd. Ngọ Môn)
-  Q245016: di_tich              # military base / căn cứ quân sự lịch sử
+  Q245016: di_tich              # military base / căn cứ quân sự — class chung chung; map
+                                 # di_tich dựa trên 3 bản ghi staged hiện tại (căn cứ thời
+                                 # chiến tranh VN, có giá trị lịch sử), KHÔNG an toàn cho
+                                 # mọi "military base" nói chung — kiểm tra lại nếu refresh
   Q10748583: chua               # Buddhist temple in Vietnam / chùa Việt Nam
   Q5393308: chua                # Buddhist temple / chùa
   Q10948212: chua               # Confucian royal ancestral shrine / miếu thờ tổ tiên hoàng gia
