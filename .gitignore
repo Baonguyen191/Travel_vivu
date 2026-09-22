@@ -23,3 +23,6 @@ desktop.ini
 
 # Scratch của quy trình subagent-driven development
 .superpowers/
+
+# Build artifact của pip install -e .
+*.egg-info/
