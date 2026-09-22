@@ -50,12 +50,16 @@ def _test_database() -> str:
 def db_conn(_test_database):
     url = _test_database
     conn = psycopg.connect(url, autocommit=True)
-    db.assert_connected_to(conn, _dbname(url))
-    db.assert_not_connected_to(conn, _dbname(db.database_url()))
-    with conn.cursor() as cur:
-        cur.execute(
-            "TRUNCATE places, place_external_ids, raw_documents, place_chunks,"
-            " place_images, reviews, weather_cache, climate_normals RESTART IDENTITY CASCADE"
-        )
+    try:
+        db.assert_is_test_database(conn)
+        db.assert_not_connected_to(conn, _dbname(db.database_url()))
+        with conn.cursor() as cur:
+            cur.execute(
+                "TRUNCATE places, place_external_ids, raw_documents, place_chunks,"
+                " place_images, reviews, weather_cache, climate_normals RESTART IDENTITY CASCADE"
+            )
+    except Exception:
+        conn.close()
+        raise
     yield conn
     conn.close()

@@ -29,33 +29,36 @@ def connect(dbname: str | None = None) -> psycopg.Connection:
     return psycopg.connect(database_url(dbname), autocommit=True)
 
 
-def assert_connected_to(conn: psycopg.Connection, expected_dbname: str) -> None:
-    """Chặn thao tác nếu `conn` không thực sự trỏ tới `expected_dbname`.
+def assert_is_test_database(conn: psycopg.Connection) -> None:
+    """Chặn thao tác nếu database hiện tại không mang dấu hiệu database test.
 
-    Dùng làm lưới an toàn trước khi TRUNCATE trong test: nếu logic dựng URL
-    kết nối ở trên có sai sót (ví dụ dùng nhầm biến, nhầm hàm connect), hàm
-    này báo lỗi rõ ràng thay vì âm thầm thao tác sai database.
+    Đây là lưới an toàn thật sự (dương tính, không tautological): kiểm tra
+    một thuộc tính cố định của `current_database()` — có hậu tố `_test` —
+    hoàn toàn độc lập với việc URL kết nối được dựng thế nào. Một guard so
+    sánh `current_database()` với tên suy ra từ chính URL vừa dùng để kết
+    nối sẽ luôn đúng theo cấu trúc (libpq luôn kết nối đúng dbname trong
+    DSN), nên không bắt được bất kỳ cấu hình sai nào; kiểm tra hậu tố tên
+    thì có.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT current_database()")
         actual = cur.fetchone()[0]
-    if actual != expected_dbname:
+    if not actual.endswith("_test"):
         raise RuntimeError(
-            f"Kết nối đang trỏ tới database '{actual}', không phải"
-            f" '{expected_dbname}' như mong đợi — từ chối thao tác để tránh"
-            " xoá nhầm dữ liệu thật."
+            f"Từ chối TRUNCATE: database '{actual}' không có hậu tố '_test',"
+            " nên không được coi là database test. Kiểm tra lại"
+            " TEST_DATABASE_URL trước khi chạy test."
         )
 
 
 def assert_not_connected_to(conn: psycopg.Connection, forbidden_dbname: str) -> None:
     """Chặn thao tác nếu `conn` đang trỏ tới `forbidden_dbname`.
 
-    Lưới an toàn thứ hai, độc lập với `assert_connected_to`: nếu
-    TEST_DATABASE_URL bị cấu hình nhầm trùng với DATABASE_URL (database
-    dev/production), `assert_connected_to` sẽ không phát hiện ra vì cả giá
-    trị mong đợi lẫn giá trị thực tế đều bị lệch theo cùng một cách — hàm
-    này bắt đúng trường hợp đó bằng cách so sánh với database bị cấm một
-    cách độc lập, thay vì âm thầm cho phép TRUNCATE dữ liệu thật.
+    Lưới an toàn thứ hai, dùng cùng `assert_is_test_database`: bắt trường
+    hợp database dev/production (theo DATABASE_URL) vô tình được đổi tên
+    thành một cái gì đó có hậu tố `_test` — khi đó hậu tố đúng nhưng đây
+    vẫn là database thật, nên phải so sánh trực tiếp với tên database
+    DATABASE_URL trỏ tới, độc lập với TEST_DATABASE_URL.
     """
     with conn.cursor() as cur:
         cur.execute("SELECT current_database()")

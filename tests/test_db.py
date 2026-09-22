@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 import pytest
 from pipeline import db
 
@@ -36,33 +38,29 @@ def test_run_migrations_is_idempotent():
         assert cur.fetchone()[0] == len(migration_files)
 
 
-def test_assert_connected_to_rejects_wrong_database():
-    conn = db.connect()  # database dev thật ("travel"), không phải test
-    try:
-        with pytest.raises(RuntimeError):
-            db.assert_connected_to(conn, "travel_test")
-    finally:
-        conn.close()
-
-
-def test_assert_connected_to_accepts_matching_database():
-    conn = db.connect()
-    try:
-        db.assert_connected_to(conn, "travel")
-    finally:
-        conn.close()
-
-
 def test_with_dbname_swaps_only_the_path():
     url = db.with_dbname("postgresql://u:p@host:5433/travel?sslmode=disable", "travel_test")
     assert url == "postgresql://u:p@host:5433/travel_test?sslmode=disable"
 
 
-def test_assert_not_connected_to_rejects_forbidden_database():
-    # Mô phỏng đúng tình huống nguy hiểm: TEST_DATABASE_URL bị cấu hình nhầm
-    # trùng với DATABASE_URL. assert_connected_to không bắt được lỗi này vì
-    # cả giá trị mong đợi lẫn thực tế đều lệch theo cùng một cách; hàm này
-    # phải bắt được.
+def test_assert_is_test_database_rejects_database_without_test_suffix():
+    # Database dev thật ("travel") không có hậu tố "_test" — phải bị từ chối
+    # dù nó có được kết nối "đúng" theo URL hay không. Nếu bỏ điều kiện hậu
+    # tố này đi, test sẽ fail vì không còn raise nữa.
+    conn = db.connect()  # database dev thật ("travel")
+    try:
+        with pytest.raises(RuntimeError):
+            db.assert_is_test_database(conn)
+    finally:
+        conn.close()
+
+
+def test_assert_not_connected_to_rejects_database_named_like_production():
+    # Mô phỏng trường hợp database dev/production bị đổi tên thành một cái
+    # gì đó có hậu tố "_test": assert_is_test_database sẽ không bắt được vì
+    # hậu tố đúng, nhưng assert_not_connected_to vẫn phải từ chối vì tên
+    # trùng với database mà DATABASE_URL trỏ tới. Nếu bỏ điều kiện này đi,
+    # test sẽ fail vì không còn raise nữa.
     conn = db.connect()  # database dev thật ("travel")
     try:
         with pytest.raises(RuntimeError):
@@ -71,9 +69,10 @@ def test_assert_not_connected_to_rejects_forbidden_database():
         conn.close()
 
 
-def test_assert_not_connected_to_accepts_other_database():
-    conn = db.connect()
-    try:
-        db.assert_not_connected_to(conn, "travel_test")
-    finally:
-        conn.close()
+def test_guards_accept_the_real_travel_test_database(db_conn):
+    # db_conn tự nó chỉ yield được nếu cả hai guard đã pass khi fixture
+    # thiết lập; gọi lại trực tiếp ở đây để khẳng định rõ ràng là database
+    # test thật ("travel_test") được cả hai điều kiện chấp nhận.
+    db.assert_is_test_database(db_conn)
+    production_dbname = urlsplit(db.database_url()).path.lstrip("/")
+    db.assert_not_connected_to(db_conn, production_dbname)
