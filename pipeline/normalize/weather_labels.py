@@ -1,4 +1,5 @@
 import csv
+import sys
 from dataclasses import replace
 
 import yaml
@@ -18,6 +19,24 @@ def load_weather_defaults(path: str = "config/weather_defaults.yml") -> dict:
         return yaml.safe_load(fh)
 
 
+def _warn(place_key: str, column: str, value: str) -> None:
+    print(
+        f"Cảnh báo: bỏ qua giá trị không hợp lệ ở '{place_key}', cột '{column}': {value!r}",
+        file=sys.stderr,
+    )
+
+
+def _parse_field(row: dict, key: str, place_key: str, column: str, convert):
+    raw = row.get(key)
+    if not raw:
+        return None
+    try:
+        return convert(raw)
+    except ValueError:
+        _warn(place_key, column, raw)
+        return None
+
+
 def load_overrides(path: str = "config/overrides.csv") -> dict[str, dict]:
     result: dict[str, dict] = {}
     with open(path, encoding="utf-8", newline="") as fh:
@@ -26,18 +45,38 @@ def load_overrides(path: str = "config/overrides.csv") -> dict[str, dict]:
             if not key:
                 continue
             entry: dict = {}
-            if row.get("indoor_ratio"):
-                entry["indoor_ratio"] = float(row["indoor_ratio"])
-            if row.get("avg_visit_minutes"):
-                entry["avg_visit_minutes"] = int(row["avg_visit_minutes"])
+
+            indoor_ratio = _parse_field(row, "indoor_ratio", key, "indoor_ratio", float)
+            if indoor_ratio is not None:
+                entry["indoor_ratio"] = indoor_ratio
+
+            avg_visit_minutes = _parse_field(
+                row, "avg_visit_minutes", key, "avg_visit_minutes", int
+            )
+            if avg_visit_minutes is not None:
+                entry["avg_visit_minutes"] = avg_visit_minutes
+
             if row.get("best_time_of_day"):
                 entry["best_time_of_day"] = row["best_time_of_day"].split("|")
             if row.get("unsafe_conditions"):
                 entry["unsafe_conditions"] = row["unsafe_conditions"].split("|")
-            if row.get("ticket_price_vnd"):
-                entry["ticket_price"] = {"vnd": int(row["ticket_price_vnd"])}
+
+            ticket_price_vnd = _parse_field(
+                row, "ticket_price_vnd", key, "ticket_price_vnd", int
+            )
+            if ticket_price_vnd is not None:
+                entry["ticket_price"] = {"vnd": ticket_price_vnd}
+
             if row.get("dress_code"):
                 entry["dress_code"] = row["dress_code"]
+
+            if not entry:
+                print(
+                    f"Cảnh báo: bỏ qua toàn bộ dòng '{key}' vì không có trường hợp lệ nào",
+                    file=sys.stderr,
+                )
+                continue
+
             result[key] = entry
     return result
 
@@ -70,6 +109,7 @@ def apply_labels(place, defaults: dict, overrides: dict):
     for key in place.external_ids:
         entry = overrides.get(f"{key}:{place.external_ids[key]}")
         if entry:
-            updated = replace(updated, label_source="manual", **entry)
+            copied = {k: (list(v) if isinstance(v, list) else v) for k, v in entry.items()}
+            updated = replace(updated, label_source="manual", **copied)
             break
     return updated

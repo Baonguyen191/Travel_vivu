@@ -43,11 +43,11 @@ quan_ca_phe:
     weather_sensitivity: { rain: 0.3, heat: 0.2, wind: 0.1 },
     best_time_of_day: [bat_ky], unsafe_conditions: [] }
 khach_san:
-  { indoor_ratio: 0.9, avg_visit_minutes: 0,
+  { indoor_ratio: 0.9, avg_visit_minutes: null,
     weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
     best_time_of_day: [bat_ky], unsafe_conditions: [] }
 don_vi_hanh_chinh:
-  { indoor_ratio: 0.5, avg_visit_minutes: 0,
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
     weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
     best_time_of_day: [bat_ky], unsafe_conditions: [] }
 khac:
