@@ -8,6 +8,7 @@ INGEST_MODULES = {
     "osm": "pipeline.ingest.osm",
     "wikipedia": "pipeline.ingest.wikipedia",
     "commons": "pipeline.ingest.commons",
+    "weather": "pipeline.ingest.weather",
 }
 
 
