@@ -7,6 +7,7 @@ INGEST_MODULES = {
     "wikidata": "pipeline.ingest.wikidata",
     "osm": "pipeline.ingest.osm",
     "wikipedia": "pipeline.ingest.wikipedia",
+    "commons": "pipeline.ingest.commons",
 }
 
 
