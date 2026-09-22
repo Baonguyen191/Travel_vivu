@@ -3,7 +3,9 @@ import re
 DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 OSM_DAYS = {"Mo": 0, "Tu": 1, "We": 2, "Th": 3, "Fr": 4, "Sa": 5, "Su": 6}
 
-TIME_RANGE_RE = re.compile(r"^([0-2]\d:[0-5]\d)-([0-2]\d:[0-5]\d)$")
+TIME_RANGE_RE = re.compile(
+    r"^((?:[01]\d|2[0-4]):[0-5]\d)-((?:[01]\d|2[0-4]):[0-5]\d)$"
+)
 DAY_TOKEN_RE = re.compile(r"^(Mo|Tu|We|Th|Fr|Sa|Su)(-(Mo|Tu|We|Th|Fr|Sa|Su))?$")
 
 
@@ -42,13 +44,21 @@ def parse_opening_hours(raw: str | None) -> dict | None:
         return {d: [["00:00", "24:00"]] for d in DAYS}
 
     result: dict[str, list[list[str]]] = {d: [] for d in DAYS}
+    matched_any_rule = False
     for rule in text.split(";"):
         rule = rule.strip()
         if not rule:
             continue
         parts = rule.split(None, 1)
-        if len(parts) != 2:
-            return None
+        if len(parts) == 1:
+            # Không có phần ngày: quy tắc chỉ gồm dải giờ, áp dụng mọi ngày.
+            intervals = _parse_intervals(parts[0])
+            if intervals is None:
+                return None
+            for d in DAYS:
+                result[d] = intervals
+            matched_any_rule = True
+            continue
         day_spec, time_spec = parts[0], parts[1].strip()
         days = _expand_days(day_spec)
         if days is None:
@@ -56,12 +66,14 @@ def parse_opening_hours(raw: str | None) -> dict | None:
         if time_spec == "off":
             for i in days:
                 result[DAYS[i]] = []
+            matched_any_rule = True
             continue
         intervals = _parse_intervals(time_spec)
         if intervals is None:
             return None
         for i in days:
             result[DAYS[i]] = intervals
-    if all(not v for v in result.values()):
+        matched_any_rule = True
+    if not matched_any_rule:
         return None
     return result
