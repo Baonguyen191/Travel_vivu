@@ -52,3 +52,50 @@ def test_fetch_raises_on_http_error(httpx_mock, tmp_path, db_conn):
         pass
     else:
         raise AssertionError("phải ném HTTPStatusError")
+
+
+def test_fetch_post_with_different_bodies_both_hit_network(httpx_mock, tmp_path, db_conn):
+    httpx_mock.add_response(
+        url="https://example.org/overpass", method="POST",
+        match_content=b"query-a", content=b"result-a",
+    )
+    httpx_mock.add_response(
+        url="https://example.org/overpass", method="POST",
+        match_content=b"query-b", content=b"result-b",
+    )
+    f = Fetcher(db_conn, "test", min_interval=0, raw_root=str(tmp_path), user_agent="ua")
+
+    first = f.fetch("https://example.org/overpass", method="POST", data="query-a")
+    second = f.fetch("https://example.org/overpass", method="POST", data="query-b")
+
+    assert first.content == b"result-a"
+    assert second.content == b"result-b"
+    assert len(httpx_mock.get_requests()) == 2
+
+
+def test_fetch_post_with_same_body_is_cached(httpx_mock, tmp_path, db_conn):
+    httpx_mock.add_response(
+        url="https://example.org/overpass", method="POST",
+        match_content=b"query-a", content=b"result-a",
+    )
+    f = Fetcher(db_conn, "test", min_interval=0, raw_root=str(tmp_path), user_agent="ua")
+    f.fetch("https://example.org/overpass", method="POST", data="query-a")
+
+    second = f.fetch("https://example.org/overpass", method="POST", data="query-a")
+
+    assert second.from_cache is True
+    assert second.content == b"result-a"
+    assert len(httpx_mock.get_requests()) == 1
+
+
+def test_fetch_different_sources_do_not_share_cache(httpx_mock, tmp_path, db_conn):
+    httpx_mock.add_response(url="https://example.org/e", content=b"shared-url")
+    httpx_mock.add_response(url="https://example.org/e", content=b"shared-url")
+    f1 = Fetcher(db_conn, "source-one", min_interval=0, raw_root=str(tmp_path), user_agent="ua")
+    f2 = Fetcher(db_conn, "source-two", min_interval=0, raw_root=str(tmp_path), user_agent="ua")
+
+    f1.fetch("https://example.org/e")
+    second = f2.fetch("https://example.org/e")
+
+    assert second.from_cache is False
+    assert len(httpx_mock.get_requests()) == 2

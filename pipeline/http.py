@@ -45,24 +45,28 @@ class Fetcher:
             time.sleep(self.min_interval - gap)
         self._last_call = time.monotonic()
 
-    def _cached(self, url: str) -> tuple[str, str] | None:
+    def _cached(self, key: str) -> tuple[str, str, int] | None:
         with self.conn.cursor() as cur:
             cur.execute(
-                "SELECT storage_path, content_hash FROM raw_documents"
-                " WHERE source_url = %s ORDER BY fetched_at DESC LIMIT 1",
-                (url,),
+                "SELECT storage_path, content_hash, http_status FROM raw_documents"
+                " WHERE source_url = %s AND source = %s"
+                " ORDER BY fetched_at DESC LIMIT 1",
+                (key, self.source),
             )
             return cur.fetchone()
 
     def fetch(self, url: str, *, params: dict | None = None, method: str = "GET",
               data: str | None = None, force: bool = False) -> FetchResult:
-        key = url if not params else str(httpx.URL(url, params=params))
+        url_key = url if not params else str(httpx.URL(url, params=params))
+        key = f"{method} {url_key}"
+        if data is not None:
+            key += f" sha256:{hashlib.sha256(data.encode('utf-8')).hexdigest()}"
         if not force:
             hit = self._cached(key)
             if hit:
                 path = self.raw_root / hit[0]
                 if path.exists():
-                    return FetchResult(path.read_bytes(), hit[0], True, 200)
+                    return FetchResult(path.read_bytes(), hit[0], True, hit[2])
 
         self._wait()
         response = self._client.request(method, url, params=params, content=data)
