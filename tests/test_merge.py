@@ -44,14 +44,12 @@ def test_merge_combines_matching_pair():
     assert place.wikidata_classes == ["Q16970"]
 
 
-def test_close_but_different_name_goes_to_review():
+def test_close_but_different_name_produces_no_review():
     wd = PlaceRecord("Chùa Thiên Mụ", {"wikidata": "Q1"}, 16.4539, 107.5453)
     osm = PlaceRecord("Quán cà phê Thiên Mụ View", {"osm": "node/9"}, 16.4540, 107.5454)
     merged, review = merge_places([wd], [osm])
     assert len(merged) == 2
-    assert len(review) == 1
-    assert review[0]["reason"] == "gan_nhung_khac_ten"
-    assert review[0]["distance_m"] < 150
+    assert review == []
 
 
 def test_same_name_far_apart_goes_to_review():

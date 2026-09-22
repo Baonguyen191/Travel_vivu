@@ -59,15 +59,14 @@ def merge_places(
             if distance < MATCH_RADIUS_M and same_name:
                 pair_index = i
                 break
-            if distance < MATCH_RADIUS_M or same_name:
+            if same_name:
                 review.append({
                     "wikidata_id": wd.external_ids.get("wikidata", ""),
                     "osm_id": candidate.external_ids.get("osm", ""),
                     "wikidata_name": wd.name,
                     "osm_name": candidate.name,
                     "distance_m": round(distance, 1),
-                    "reason": ("gan_nhung_khac_ten" if distance < MATCH_RADIUS_M
-                               else "trung_ten_nhung_xa"),
+                    "reason": "trung_ten_nhung_xa",
                 })
 
         if pair_index is None:
