@@ -20,3 +20,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Scratch của quy trình subagent-driven development
+.superpowers/
