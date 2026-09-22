@@ -6,6 +6,7 @@ INGEST_MODULES = {
     "boundary": "pipeline.ingest.boundary",
     "wikidata": "pipeline.ingest.wikidata",
     "osm": "pipeline.ingest.osm",
+    "wikipedia": "pipeline.ingest.wikipedia",
 }
 
 
