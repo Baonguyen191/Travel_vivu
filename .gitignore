@@ -1,6 +1,7 @@
 # Dữ liệu thô và kết quả QA — sinh lại được bằng pipeline
 data/raw/
 data/qa/
+data/generated/
 
 # Bí mật
 .env

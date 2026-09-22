@@ -23,6 +23,11 @@ def main() -> int:
 
         from pipeline.config import load_city
 
+        if args.source not in INGEST_MODULES:
+            valid = ", ".join(sorted(INGEST_MODULES))
+            print(f"Nguồn không hợp lệ: '{args.source}'. Các nguồn hợp lệ: {valid}")
+            return 1
+
         module = importlib.import_module(INGEST_MODULES[args.source])
         conn = db.connect()
         count = module.run(conn, load_city(), force=args.force)

@@ -9,7 +9,7 @@ class CityConfig:
     bbox: tuple[float, float, float, float]
     core_center: tuple[float, float]
     core_radius_km: float
-    polygon_wkt: str | None = None
+    polygon_path: str | None = None
 
 
 def load_city(path: str = "config/city_hue.yml") -> CityConfig:
@@ -20,7 +20,7 @@ def load_city(path: str = "config/city_hue.yml") -> CityConfig:
         bbox=tuple(raw["bbox"]),
         core_center=tuple(raw["core_center"]),
         core_radius_km=float(raw["core_radius_km"]),
-        polygon_wkt=raw.get("polygon_wkt"),
+        polygon_path=raw.get("polygon_path"),
     )
 
 
