@@ -23,8 +23,18 @@ def _find_place_id(cur, external_ids: dict[str, str]) -> int | None:
 
 
 def upsert_places(conn, places: list[PlaceRecord]) -> tuple[int, int]:
+    """Thêm mới/cập nhật `places` theo một transaction duy nhất.
+
+    `conn` mở ở chế độ autocommit (xem `pipeline/db.py`), nên nếu không có
+    `conn.transaction()` bọc quanh toàn bộ vòng lặp, mỗi INSERT/UPDATE/liên
+    kết external_id sẽ tự commit ngay khi thực thi. Một lỗi ở giữa batch khi
+    đó để lại các bản ghi trước đó đã ghi xuống DB còn phần còn lại thì
+    không — dữ liệu ở trạng thái dở dang cho tới khi ai đó chạy lại `load`.
+    Bọc trong `conn.transaction()` đảm bảo cả batch hoặc thành công trọn
+    vẹn, hoặc rollback toàn bộ.
+    """
     inserted = updated = 0
-    with conn.cursor() as cur:
+    with conn.transaction(), conn.cursor() as cur:
         for place in places:
             values = (
                 place.name, place.name_en, place.category,

@@ -23,7 +23,7 @@ def load_staged(path: str) -> list[PlaceRecord]:
     return [PlaceRecord(**row) for row in json.loads(file.read_text(encoding="utf-8"))]
 
 
-def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict]]:
+def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict], int]:
     wikidata = [p for p in load_staged(WIKIDATA_STAGED_PATH) if within_core(p, cfg)]
     osm = [p for p in load_staged(OSM_STAGED_PATH) if within_core(p, cfg)]
     places, review = merge_places(wikidata, osm)
@@ -51,4 +51,4 @@ def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict]]:
         writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
         writer.writerows(review)
-    return result, review
+    return result, review, dropped

@@ -1,3 +1,6 @@
+import psycopg
+import pytest
+
 from pipeline.load.upsert import upsert_places
 from pipeline.models import PlaceRecord
 
@@ -46,3 +49,17 @@ def test_upsert_writes_geography_point(db_conn):
         lat, lon = cur.fetchone()
         assert round(lat, 4) == 16.4539
         assert round(lon, 4) == 107.5453
+
+
+def test_upsert_rolls_back_whole_batch_when_one_record_fails(db_conn):
+    good = _place(external_ids={"wikidata": "Q1"})
+    # category=None vi phạm NOT NULL của cột `category` — lỗi có chủ đích
+    # để mô phỏng một bản ghi hỏng ở giữa batch.
+    bad = _place(external_ids={"wikidata": "Q2"}, category=None)
+
+    with pytest.raises(psycopg.Error):
+        upsert_places(db_conn, [good, bad])
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM places")
+        assert cur.fetchone()[0] == 0

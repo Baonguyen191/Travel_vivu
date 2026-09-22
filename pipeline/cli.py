@@ -45,7 +45,7 @@ def main() -> int:
 
         conn = db.connect()
         cfg = load_city()
-        places, review = normalize_pipeline.run(conn, cfg)
+        places, review, _dropped = normalize_pipeline.run(conn, cfg)
         print(f"normalize: {len(places)} địa điểm, {len(review)} cặp chờ xem tay")
         if args.command == "load":
             inserted, updated = upsert_places(conn, places)
