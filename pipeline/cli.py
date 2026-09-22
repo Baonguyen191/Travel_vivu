@@ -2,7 +2,10 @@ import argparse
 
 from pipeline import db
 
-INGEST_MODULES = {"boundary": "pipeline.ingest.boundary"}
+INGEST_MODULES = {
+    "boundary": "pipeline.ingest.boundary",
+    "wikidata": "pipeline.ingest.wikidata",
+}
 
 
 def main() -> int:
