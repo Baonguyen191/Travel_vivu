@@ -45,6 +45,11 @@ def _api_url(params: dict) -> str:
     return str(httpx.URL(commons.API_URL, params=params))
 
 
+def _p18_url(filename: str) -> str:
+    return _api_url({"action": "query", "titles": f"File:{filename}", "prop": "imageinfo",
+                      "iiprop": "url|extmetadata", "format": "json"})
+
+
 def _image_body(url: str, license_: str = "CC BY-SA 4.0", author: str = "Ai đó") -> bytes:
     return json.dumps({"query": {"pages": {"1": {"title": "File:x.jpg", "imageinfo": [{
         "url": url,
@@ -70,12 +75,9 @@ def _setup(monkeypatch, staged_records: list[dict]) -> str:
     return raw_root
 
 
-def _insert_place(db_conn, name: str, qid: str, category: str = "di_tich") -> int:
+def _insert_place(db_conn, name: str, qid: str) -> int:
     with db_conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO places (name, category) VALUES (%s, %s) RETURNING id",
-            (name, category),
-        )
+        cur.execute("INSERT INTO places (name) VALUES (%s) RETURNING id", (name,))
         place_id = cur.fetchone()[0]
         cur.execute(
             "INSERT INTO place_external_ids (place_id, source, external_id)"
@@ -93,9 +95,9 @@ def test_run_prefers_p18_image_when_present(httpx_mock, monkeypatch, db_conn):
     ])
     place_id = _insert_place(db_conn, "Chỗ P18", "Q1")
 
-    url = _api_url({"action": "query", "titles": "File:A B.jpg", "prop": "imageinfo",
-                     "iiprop": "url|extmetadata", "format": "json"})
-    httpx_mock.add_response(url=url, content=_image_body("https://upload.wikimedia.org/a.jpg"))
+    httpx_mock.add_response(
+        url=_p18_url("A B.jpg"), content=_image_body("https://upload.wikimedia.org/a.jpg")
+    )
 
     try:
         written = commons.run(db_conn, CFG)
@@ -133,39 +135,17 @@ def test_run_lists_commons_category_when_no_p18(httpx_mock, monkeypatch, db_conn
     assert rows == [(place_id, "https://upload.wikimedia.org/b.jpg", "category")]
 
 
-def test_run_falls_back_to_name_search_when_neither_present(httpx_mock, monkeypatch, db_conn):
+def test_run_skips_place_without_structured_tags_and_makes_no_request(
+    httpx_mock, monkeypatch, db_conn
+):
+    """Không còn route tìm theo tên: một địa điểm không có image_url lẫn
+    commons_category không sinh ảnh nào, và không gửi request nào tới
+    Commons API. Không có response nào được đăng ký trong httpx_mock — nếu
+    code lỡ gọi API, httpx_mock sẽ ném lỗi khiến test thất bại."""
     raw_root = _setup(monkeypatch, [
         {"external_ids": {"wikidata": "Q3"}, "tags": {}},
     ])
-    place_id = _insert_place(db_conn, "Địa danh không rõ", "Q3", category="di_tich")
-
-    url = _api_url({"action": "query", "generator": "search",
-                     "gsrsearch": "Địa danh không rõ Huế filetype:bitmap", "gsrnamespace": "6",
-                     "gsrlimit": "30", "prop": "imageinfo",
-                     "iiprop": "url|extmetadata", "format": "json"})
-    httpx_mock.add_response(url=url, content=_image_body("https://upload.wikimedia.org/c.jpg"))
-
-    try:
-        written = commons.run(db_conn, CFG)
-    finally:
-        shutil.rmtree(raw_root, ignore_errors=True)
-
-    assert written == 1
-    with db_conn.cursor() as cur:
-        cur.execute("SELECT place_id, image_url, route FROM place_images")
-        rows = cur.fetchall()
-    assert rows == [(place_id, "https://upload.wikimedia.org/c.jpg", "name_search")]
-
-
-def test_run_skips_excluded_category_without_structured_tags(httpx_mock, monkeypatch, db_conn):
-    """Khách sạn/nhà hàng/quán cà phê/'khác' không phải mục tiêu nhận diện —
-    khi không có image_url lẫn commons_category, route name_search bị bỏ
-    hẳn, không gửi request nào. Nếu code lỡ gọi API, httpx_mock (không đăng
-    ký response nào) sẽ ném lỗi khiến test thất bại."""
-    raw_root = _setup(monkeypatch, [
-        {"external_ids": {"wikidata": "Q7"}, "tags": {}},
-    ])
-    _insert_place(db_conn, "Khách sạn ABC", "Q7", category="khach_san")
+    _insert_place(db_conn, "Địa danh không rõ", "Q3")
 
     try:
         written = commons.run(db_conn, CFG)
@@ -178,48 +158,20 @@ def test_run_skips_excluded_category_without_structured_tags(httpx_mock, monkeyp
         assert cur.fetchone() == (0,)
 
 
-def test_run_appends_city_name_to_name_search_query(httpx_mock, monkeypatch, db_conn):
-    raw_root = _setup(monkeypatch, [
-        {"external_ids": {"wikidata": "Q8"}, "tags": {}},
-    ])
-    place_id = _insert_place(db_conn, "Cầu Trường Tiền", "Q8", category="diem_tham_quan")
-
-    url = _api_url({"action": "query", "generator": "search",
-                     "gsrsearch": "Cầu Trường Tiền Huế filetype:bitmap", "gsrnamespace": "6",
-                     "gsrlimit": "30", "prop": "imageinfo",
-                     "iiprop": "url|extmetadata", "format": "json"})
-    httpx_mock.add_response(url=url, content=_image_body("https://upload.wikimedia.org/f.jpg"))
-
-    try:
-        written = commons.run(db_conn, CFG)
-    finally:
-        shutil.rmtree(raw_root, ignore_errors=True)
-
-    assert written == 1
-    with db_conn.cursor() as cur:
-        cur.execute("SELECT place_id, image_url, route FROM place_images")
-        rows = cur.fetchall()
-    assert rows == [(place_id, "https://upload.wikimedia.org/f.jpg", "name_search")]
-
-
 def test_run_skips_place_on_http_error_and_continues(httpx_mock, monkeypatch, db_conn):
     raw_root = _setup(monkeypatch, [
-        {"external_ids": {"wikidata": "Q4"}, "tags": {}},
-        {"external_ids": {"wikidata": "Q5"}, "tags": {}},
+        {"external_ids": {"wikidata": "Q4"},
+         "tags": {"image_url": "http://commons.wikimedia.org/wiki/Special:FilePath/loi.jpg"}},
+        {"external_ids": {"wikidata": "Q5"},
+         "tags": {"image_url": "http://commons.wikimedia.org/wiki/Special:FilePath/on.jpg"}},
     ])
-    place_error = _insert_place(db_conn, "Chỗ lỗi", "Q4", category="di_tich")
-    place_ok = _insert_place(db_conn, "Chỗ ổn", "Q5", category="di_tich")
+    _insert_place(db_conn, "Chỗ lỗi", "Q4")
+    place_ok = _insert_place(db_conn, "Chỗ ổn", "Q5")
 
-    url_error = _api_url({"action": "query", "generator": "search",
-                           "gsrsearch": "Chỗ lỗi Huế filetype:bitmap", "gsrnamespace": "6",
-                           "gsrlimit": "30", "prop": "imageinfo",
-                           "iiprop": "url|extmetadata", "format": "json"})
-    url_ok = _api_url({"action": "query", "generator": "search",
-                        "gsrsearch": "Chỗ ổn Huế filetype:bitmap", "gsrnamespace": "6",
-                        "gsrlimit": "30", "prop": "imageinfo",
-                        "iiprop": "url|extmetadata", "format": "json"})
-    httpx_mock.add_response(url=url_error, status_code=503)
-    httpx_mock.add_response(url=url_ok, content=_image_body("https://upload.wikimedia.org/d.jpg"))
+    httpx_mock.add_response(url=_p18_url("loi.jpg"), status_code=503)
+    httpx_mock.add_response(
+        url=_p18_url("on.jpg"), content=_image_body("https://upload.wikimedia.org/d.jpg")
+    )
 
     try:
         written = commons.run(db_conn, CFG)
@@ -235,16 +187,17 @@ def test_run_skips_place_on_http_error_and_continues(httpx_mock, monkeypatch, db
 
 def test_second_run_inserts_nothing_new(httpx_mock, monkeypatch, db_conn):
     raw_root = _setup(monkeypatch, [
-        {"external_ids": {"wikidata": "Q6"}, "tags": {}},
+        {"external_ids": {"wikidata": "Q6"},
+         "tags": {"image_url": "http://commons.wikimedia.org/wiki/Special:FilePath/lap.jpg"}},
     ])
-    _insert_place(db_conn, "Chỗ lặp", "Q6", category="di_tich")
+    _insert_place(db_conn, "Chỗ lặp", "Q6")
 
-    url = _api_url({"action": "query", "generator": "search",
-                     "gsrsearch": "Chỗ lặp Huế filetype:bitmap", "gsrnamespace": "6",
-                     "gsrlimit": "30", "prop": "imageinfo",
-                     "iiprop": "url|extmetadata", "format": "json"})
-    httpx_mock.add_response(url=url, content=_image_body("https://upload.wikimedia.org/e.jpg"))
-    httpx_mock.add_response(url=url, content=_image_body("https://upload.wikimedia.org/e.jpg"))
+    httpx_mock.add_response(
+        url=_p18_url("lap.jpg"), content=_image_body("https://upload.wikimedia.org/e.jpg")
+    )
+    httpx_mock.add_response(
+        url=_p18_url("lap.jpg"), content=_image_body("https://upload.wikimedia.org/e.jpg")
+    )
 
     try:
         first = commons.run(db_conn, CFG, force=True)
