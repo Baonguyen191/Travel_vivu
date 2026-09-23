@@ -10,16 +10,38 @@ COLUMNS = """
 """
 
 
-def _find_place_id(cur, external_ids: dict[str, str]) -> int | None:
+def _find_place_id(cur, external_ids: dict[str, str], record_label: str = "") -> int | None:
+    """Tra `place_id` theo bất kỳ external id nào của bản ghi.
+
+    Nếu các external_id của CÙNG một bản ghi trỏ tới NHIỀU place_id khác
+    nhau (ví dụ Lăng Tự Đức từng nạp thành hai bản ghi riêng ở hai lần load
+    trước khi merge nhận ra chúng là một), trước đây hàm này lặng lẽ trả về
+    place_id đầu tiên gặp — bản ghi kia mồ côi vĩnh viễn trong bảng `places`
+    mà không ai biết. Không tự gộp (ngoài phạm vi ở đây) — chỉ in cảnh báo
+    để việc này nhìn thấy được, rồi vẫn trả về một place_id để tiếp tục
+    upsert như trước.
+    """
+    found: dict[int, tuple[str, str]] = {}
     for source, external_id in external_ids.items():
         cur.execute(
             "SELECT place_id FROM place_external_ids WHERE source = %s AND external_id = %s",
             (source, external_id),
         )
         row = cur.fetchone()
-        if row:
-            return row[0]
-    return None
+        if row and row[0] not in found:
+            found[row[0]] = (source, external_id)
+    if len(found) > 1:
+        details = ", ".join(f"place_id={pid} (khớp {src}:{eid})"
+                             for pid, (src, eid) in sorted(found.items()))
+        print(
+            f"upsert: cảnh báo — bản ghi '{record_label}' khớp nhiều place_id"
+            f" khác nhau qua các external_id khác nhau: {details}."
+            " Có khả năng đây là hai bản ghi trùng chưa được gộp; chỉ"
+            " place_id nhỏ nhất được dùng, các place_id còn lại có thể mồ côi."
+        )
+    if not found:
+        return None
+    return min(found)
 
 
 def upsert_places(conn, places: list[PlaceRecord]) -> tuple[int, int]:
@@ -47,7 +69,7 @@ def upsert_places(conn, places: list[PlaceRecord]) -> tuple[int, int]:
                 place.best_time_of_day, place.unsafe_conditions, place.label_source,
                 place.website, place.source_url,
             )
-            place_id = _find_place_id(cur, place.external_ids)
+            place_id = _find_place_id(cur, place.external_ids, place.name)
             if place_id is None:
                 cur.execute(
                     f"INSERT INTO places ({COLUMNS}) VALUES"

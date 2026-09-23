@@ -51,6 +51,29 @@ def test_upsert_writes_geography_point(db_conn):
         assert round(lon, 4) == 107.5453
 
 
+def test_upsert_warns_when_external_ids_point_to_different_place_ids(db_conn, capsys):
+    # Hai lần load trước khi merge nhận ra chúng là một địa điểm: một bản
+    # ghi chỉ có osm, một bản ghi chỉ có wikidata, hai place_id riêng biệt.
+    # Lần thứ ba tới với CẢ HAI external_id (kết quả merge) — trước fix này,
+    # _find_place_id lặng lẽ chọn place_id gặp đầu tiên và bản ghi kia mồ
+    # côi vĩnh viễn, không ai biết.
+    upsert_places(db_conn, [_place(name="Lăng Tự Đức (OSM)", external_ids={"osm": "way/1"})])
+    upsert_places(db_conn, [_place(name="Lăng Tự Đức (Wikidata)",
+                                    external_ids={"wikidata": "Q1"})])
+    capsys.readouterr()  # xoá output của hai lần upsert trên
+
+    upsert_places(db_conn, [_place(name="Lăng Tự Đức",
+                                    external_ids={"osm": "way/1", "wikidata": "Q1"})])
+    warning = capsys.readouterr().out
+    assert "Lăng Tự Đức" in warning
+    assert "osm:way/1" in warning
+    assert "wikidata:Q1" in warning
+
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM places")
+        assert cur.fetchone()[0] == 2  # cả hai bản ghi cũ vẫn còn, không gộp
+
+
 def test_upsert_rolls_back_whole_batch_when_one_record_fails(db_conn):
     good = _place(external_ids={"wikidata": "Q1"})
     # category=None vi phạm NOT NULL của cột `category` — lỗi có chủ đích
