@@ -3,8 +3,7 @@ from pathlib import Path
 
 from pipeline.config import CityConfig, save_city
 from pipeline.http import Fetcher
-
-OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+from pipeline.ingest.overpass import fetch_overpass
 
 QUERY = """
 [out:json][timeout:180];
@@ -71,7 +70,7 @@ def rings_to_wkt(elements: list[dict]) -> str:
 
 def run(conn, cfg: CityConfig, force: bool = False) -> int:
     fetcher = Fetcher(conn, "osm_boundary", min_interval=2.0)
-    res = fetcher.fetch(OVERPASS_URL, method="POST", data=QUERY, force=force)
+    res = fetch_overpass(fetcher, QUERY, force)
     elements = json.loads(res.content)["elements"]
     wkt = rings_to_wkt(elements)
 

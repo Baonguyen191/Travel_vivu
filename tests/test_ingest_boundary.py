@@ -1,5 +1,14 @@
+import functools
+import json
+import shutil
+import tempfile
+from pathlib import Path
+
 import pytest
 
+from pipeline.config import CityConfig
+from pipeline.http import Fetcher
+from pipeline.ingest import boundary, overpass
 from pipeline.ingest.boundary import rings_to_wkt
 
 
@@ -73,3 +82,58 @@ def test_rings_to_wkt_raises_when_a_way_does_not_connect():
     ]
     with pytest.raises(ValueError, match="1"):
         rings_to_wkt(elements)
+
+
+def test_run_falls_back_to_second_mirror_on_504(httpx_mock, monkeypatch, db_conn):
+    # Trước fix này, boundary.py gọi thẳng OVERPASS_URL (hard-code, không
+    # retry): một 504 duy nhất ném httpx.HTTPStatusError ra ngoài, làm chết
+    # cả `all` ở bước 2 (boundary chạy trước wikidata/osm). Test này không
+    # chạm mạng thật lẫn cache thật: raw_root riêng và ngắn (pytest tmp_path
+    # lồng quá sâu, vượt giới hạn 260 ký tự đường dẫn của Windows — dùng
+    # tempfile.mkdtemp() như các test ingest khác), mock đúng hai request
+    # theo thứ tự mirror.
+    raw_root = tempfile.mkdtemp(prefix="boundary_raw_")
+    generated_wkt = Path(raw_root) / "city_hue_boundary.wkt"
+    monkeypatch.setattr(overpass.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(
+        boundary,
+        "Fetcher",
+        functools.partial(Fetcher, raw_root=raw_root, user_agent="test-ua"),
+    )
+    monkeypatch.setattr(boundary, "GENERATED_WKT_PATH", str(generated_wkt))
+    # run() ghi cứng "config/city_hue.yml" — thay save_city bằng một hàm ghi
+    # nhận để test không đè lên file config thật của repo.
+    saved_calls = []
+    monkeypatch.setattr(
+        boundary, "save_city", lambda cfg_out, path: saved_calls.append((cfg_out, path))
+    )
+
+    httpx_mock.add_response(
+        url=overpass.OVERPASS_ENDPOINTS[0], method="POST", status_code=504,
+    )
+    body = json.dumps({"elements": [
+        {"type": "relation", "tags": {"admin_level": "4", "name": "Thành phố Huế"},
+         "members": [{"role": "outer", "geometry": [
+             {"lat": 16.4, "lon": 107.5}, {"lat": 16.5, "lon": 107.5},
+             {"lat": 16.5, "lon": 107.6},
+         ]}]},
+    ]}).encode("utf-8")
+    httpx_mock.add_response(
+        url=overpass.OVERPASS_ENDPOINTS[1], method="POST", content=body,
+    )
+
+    cfg = CityConfig(
+        name="Test City - không dùng cho pipeline thật",
+        bbox=(1.0, 2.0, 3.0, 4.0),
+        core_center=(2.0, 3.0),
+        core_radius_km=1.0,
+    )
+    try:
+        count = boundary.run(db_conn, cfg, force=False)
+    finally:
+        shutil.rmtree(raw_root, ignore_errors=True)
+
+    assert count == 1
+    assert saved_calls  # save_city được gọi đúng một lần sau khi ghép ranh giới
+    requested_urls = [str(r.url) for r in httpx_mock.get_requests()]
+    assert requested_urls == [overpass.OVERPASS_ENDPOINTS[0], overpass.OVERPASS_ENDPOINTS[1]]

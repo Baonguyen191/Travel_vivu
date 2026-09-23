@@ -3,7 +3,7 @@ import json
 
 from pipeline.config import CityConfig
 from pipeline.http import Fetcher
-from pipeline.ingest import osm
+from pipeline.ingest import osm, overpass
 from pipeline.ingest.osm import parse_elements
 
 
@@ -39,7 +39,7 @@ def test_run_falls_back_to_next_endpoint_on_504(
     # "data/raw" thật) và một bbox không trùng config/city_hue.yml, để nếu
     # dòng raw_documents còn sót lại trong DB dùng chung, nó không bao giờ
     # trùng cache key với truy vấn Overpass thật của pipeline.
-    monkeypatch.setattr(osm.time, "sleep", lambda *_: None)
+    monkeypatch.setattr(overpass.time, "sleep", lambda *_: None)
     monkeypatch.setattr(osm, "STAGED_PATH", str(tmp_path / "osm.json"))
     monkeypatch.setattr(
         osm,
