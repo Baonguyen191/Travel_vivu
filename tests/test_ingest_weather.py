@@ -22,7 +22,7 @@ def _forecast_url(lat: float, lon: float) -> str:
     return str(httpx.URL(
         weather.FORECAST_URL,
         params={"latitude": lat, "longitude": lon, "hourly": weather.HOURLY,
-                "forecast_days": 16, "timezone": "Asia/Bangkok"},
+                "forecast_days": 16, "timezone": "Asia/Ho_Chi_Minh"},
     ))
 
 
@@ -31,7 +31,7 @@ def _archive_url(lat: float, lon: float) -> str:
         weather.ARCHIVE_URL,
         params={"latitude": lat, "longitude": lon, "start_date": "1991-01-01",
                 "end_date": "2020-12-31", "daily": weather.DAILY,
-                "timezone": "Asia/Bangkok"},
+                "timezone": "Asia/Ho_Chi_Minh"},
     ))
 
 
@@ -206,3 +206,66 @@ def test_run_guards_forecast_and_archive_fetch_independently(httpx_mock, monkeyp
         assert cur.fetchone()[0] == 1
         cur.execute("SELECT count(*) FROM climate_normals")
         assert cur.fetchone()[0] == 2
+
+
+def test_run_always_refetches_forecast_but_caches_archive(httpx_mock, monkeypatch, db_conn):
+    # Trước fix này, forecast và archive dùng cùng cờ `force` của run(). URL
+    # forecast không có tham số ngày nên là byte-identical mỗi lần gọi —
+    # Fetcher trả lại bản thô cũ từ cache và chỉ ghi đè fetched_at = now(),
+    # trong khi dữ liệu dự báo bên trong đã lỗi thời. Test này chạy run()
+    # hai lần với force=False cả hai lần: forecast phải gọi HTTP cả hai lần
+    # (đăng ký hai response khác nhau và cả hai phải được tiêu thụ), còn
+    # archive (dữ liệu bất biến 1991-2020) chỉ được gọi một lần rồi phục vụ
+    # từ cache ở lần thứ hai.
+    raw_root = tempfile.mkdtemp(prefix="weather_raw_")
+    monkeypatch.setattr(weather, "MIN_INTERVAL", 0)
+    monkeypatch.setattr(
+        weather,
+        "Fetcher",
+        functools.partial(Fetcher, raw_root=raw_root, user_agent="test-ua"),
+    )
+
+    def _forecast_payload(temp: float) -> bytes:
+        return json.dumps({"utc_offset_seconds": 25200, "hourly": {
+            "time": ["2026-09-22T00:00"],
+            "temperature_2m": [temp],
+            "precipitation_probability": [30],
+            "precipitation": [0.0],
+            "wind_speed_10m": [9.0],
+            "uv_index": [0.0],
+            "weather_code": [2],
+        }}).encode("utf-8")
+
+    archive_payload = json.dumps({"daily": {
+        "time": ["2020-01-01"],
+        "temperature_2m_mean": [21.0],
+        "precipitation_sum": [0.0],
+        "wind_speed_10m_max": [10.0],
+    }}).encode("utf-8")
+
+    # Một ô lưới, hai response forecast khác nhau đăng ký theo thứ tự —
+    # httpx_mock tiêu thụ tuần tự, nên nếu run() thứ hai không thật sự gọi
+    # HTTP (bị cache chặn), response thứ hai sẽ còn thừa và pytest-httpx sẽ
+    # báo lỗi assert_all_responses_were_requested ở cuối test.
+    httpx_mock.add_response(url=_forecast_url(16.5, 107.6), content=_forecast_payload(27.0))
+    httpx_mock.add_response(url=_forecast_url(16.5, 107.6), content=_forecast_payload(31.0))
+    httpx_mock.add_response(url=_archive_url(16.5, 107.6), content=archive_payload)
+
+    tiny_cfg = CityConfig("Huế", (16.5, 107.6, 16.5, 107.6), (16.5, 107.6), 5.0)
+    try:
+        weather.run(db_conn, tiny_cfg)
+        weather.run(db_conn, tiny_cfg)
+    finally:
+        shutil.rmtree(raw_root, ignore_errors=True)
+
+    with db_conn.cursor() as cur:
+        cur.execute(
+            "SELECT temperature FROM weather_cache"
+            " WHERE lat_grid = 16.5 AND lon_grid = 107.6"
+            " AND forecast_time = '2026-09-22T00:00+07:00'::timestamptz"
+        )
+        # Nhiệt độ phải là giá trị của response THỨ HAI — chứng minh forecast
+        # được refetch chứ không phục vụ từ cache của lần chạy trước.
+        assert cur.fetchone()[0] == 31.0
+        cur.execute("SELECT count(*) FROM climate_normals")
+        assert cur.fetchone()[0] == 1

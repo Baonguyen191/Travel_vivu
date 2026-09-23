@@ -90,11 +90,16 @@ def run(conn, cfg: CityConfig, force: bool = False) -> int:
     written = 0
     for lat, lon in grid_points(cfg):
         try:
+            # Dự báo là dữ liệu "luôn mới" theo bản chất — URL không đổi giữa
+            # các lần gọi (không có tham số ngày), nên cache theo hash request
+            # của Fetcher sẽ trả lại đúng bản thô cũ mãi mãi nếu không force.
+            # force=True vô điều kiện ở đây, độc lập với tham số `force` của
+            # run() (tham số đó chỉ còn áp dụng cho archive, dữ liệu bất biến).
             forecast = fetcher.fetch(
                 FORECAST_URL,
                 params={"latitude": lat, "longitude": lon, "hourly": HOURLY,
-                        "forecast_days": 16, "timezone": "Asia/Bangkok"},
-                force=force,
+                        "forecast_days": 16, "timezone": "Asia/Ho_Chi_Minh"},
+                force=True,
             )
         except httpx.HTTPStatusError as exc:
             print(
@@ -127,7 +132,8 @@ def run(conn, cfg: CityConfig, force: bool = False) -> int:
             archive = fetcher.fetch(
                 ARCHIVE_URL,
                 params={"latitude": lat, "longitude": lon, "start_date": "1991-01-01",
-                        "end_date": "2020-12-31", "daily": DAILY, "timezone": "Asia/Bangkok"},
+                        "end_date": "2020-12-31", "daily": DAILY,
+                        "timezone": "Asia/Ho_Chi_Minh"},
                 force=force,
             )
         except httpx.HTTPStatusError as exc:

@@ -73,7 +73,7 @@ Lệnh `all` chạy tuần tự theo `pipeline.cli.PIPELINE_ORDER`:
 | `load` | Gộp Wikidata + OSM theo rule-based (category, opening_hours, mặc định thời tiết theo category, `config/overrides.csv`) — tức chạy đúng một lượt bước `normalize` — rồi upsert kết quả vào bảng `places` (và bảng liên kết) |
 | `wikipedia` | Với mỗi place đã có `id` trong DB, lấy tóm tắt Wikipedia, cắt đoạn (chunk) cho RAG (`place_chunks`) |
 | `commons` | Với mỗi place đã có `id`, lấy ảnh tham chiếu từ Wikimedia Commons (`place_images`) |
-| `weather` | Nạp dự báo giờ (Open-Meteo forecast) và khí hậu trung bình nhiều năm (Open-Meteo archive) theo lưới toạ độ ~0.1 độ, độc lập với place nên chạy sau cùng |
+| `weather` | Nạp dự báo giờ (Open-Meteo forecast) và khí hậu trung bình nhiều năm (Open-Meteo archive) theo lưới toạ độ ~0.1 độ, độc lập với place nên chạy sau cùng — phần **forecast luôn gọi lại API** (xem ghi chú dưới), phần archive dùng cache như các nguồn khác |
 | `qa` | In báo cáo chất lượng dữ liệu (coverage, ngưỡng PASS/FAIL) |
 
 Thứ tự này bắt buộc vì `wikipedia`/`commons` cần `places.id` (chỉ có sau
@@ -88,6 +88,17 @@ Mỗi lệnh **an toàn để chạy lại nhiều lần**: `Fetcher` cache bả
 request trong `data/raw/`, migration chỉ áp phần chưa chạy, `load` dùng
 upsert (`ON CONFLICT DO UPDATE`), `weather_cache` khoá chính theo
 `(lat_grid, lon_grid, forecast_time)` nên ghi lại không nhân bản dòng.
+
+**Ngoại lệ: phần forecast của `weather` không dùng cache.** URL forecast
+không có tham số ngày (chỉ toạ độ + "16 ngày kể từ hôm nay"), nên nó
+byte-identical giữa các lần gọi — nếu dùng cache như mọi nguồn khác, `Fetcher`
+sẽ trả mãi bản thô của lần fetch đầu tiên trong khi `fetched_at` vẫn ghi
+`now()`, khiến dữ liệu trông "vừa mới lấy" nhưng thật ra đã cũ. Vì vậy
+`pipeline.ingest.weather.run()` luôn gọi lại API cho phần forecast (bỏ qua
+cache) mỗi khi chạy, kể cả không có `--force` — không cần và không nên
+truyền `--force` chỉ để "làm mới" forecast. Phần archive (khí hậu 1991–2020)
+là dữ liệu bất biến nên vẫn dùng cache như bình thường; `--force` cho
+`weather` chỉ có tác dụng lên phần archive.
 
 ### Chạy lại một bước riêng lẻ
 
