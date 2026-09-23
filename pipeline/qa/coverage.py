@@ -28,6 +28,7 @@ class Metric:
     threshold: float | None
     passed: bool
     informational: bool = False
+    key: str | None = None
 
 
 def _count(cur, sql: str, params: tuple = ()) -> int:
@@ -76,7 +77,7 @@ def collect_metrics(conn, cfg) -> list[Metric]:
         value = core_with_hours / core_total if core_total else 0.0
         hours_metric = Metric(
             "Di tích, bảo tàng, lăng tẩm có opening_hours parse được",
-            value, 0.05, value >= 0.05,
+            value, 0.05, value >= 0.05, key="opening_hours",
         )
 
         wikidata_total = _count(
@@ -99,7 +100,9 @@ def collect_metrics(conn, cfg) -> list[Metric]:
         manual = _count(
             cur, "SELECT count(*) FROM places WHERE label_source = 'manual'"
         )
-        manual_metric = Metric("Địa danh gán nhãn tay", manual, 100, manual >= 100)
+        manual_metric = Metric(
+            "Địa danh gán nhãn tay", manual, 100, manual >= 100, key="manual_label"
+        )
 
         five_plus = _count(
             cur,
@@ -139,10 +142,10 @@ def render_report(metrics: list[Metric], merge_review_rows: int) -> str:
 
     lines += ["", f"Cặp chờ xem tay trong merge_review.csv: {merge_review_rows}", ""]
 
-    names = {m.name for m in metrics}
-    if "Di tích, bảo tàng, lăng tẩm có opening_hours parse được" in names:
+    keys = {m.key for m in metrics if m.key is not None}
+    if "opening_hours" in keys:
         lines.append(OPENING_HOURS_NOTE)
-    if "Địa danh gán nhãn tay" in names:
+    if "manual_label" in keys:
         lines.append(MANUAL_LABEL_NOTE)
 
     return "\n".join(lines) + "\n"

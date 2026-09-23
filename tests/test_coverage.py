@@ -1,7 +1,13 @@
 from pipeline.config import CityConfig
 from pipeline.load.upsert import upsert_places
 from pipeline.models import PlaceRecord
-from pipeline.qa.coverage import Metric, collect_metrics, render_report
+from pipeline.qa.coverage import (
+    MANUAL_LABEL_NOTE,
+    OPENING_HOURS_NOTE,
+    Metric,
+    collect_metrics,
+    render_report,
+)
 
 CFG = CityConfig("Huế", (16.335, 107.435, 16.605, 107.725), (16.4698, 107.5796), 15.0)
 
@@ -58,3 +64,61 @@ def test_collect_metrics_wikidata_image_coverage(db_conn):
     assert metric.value == 0.5
     assert metric.threshold == 0.25
     assert metric.passed is True
+
+
+def test_collect_metrics_coordinate_inside_core_radius(db_conn):
+    upsert_places(db_conn, [
+        # ~10 km về phía đông tâm — trong bán kính thật (15 km), nhưng sẽ bị
+        # loại nếu code lấy sai đơn vị bán kính (km thay vì mét, tức 15 m
+        # thay vì 15000 m).
+        PlaceRecord("Trong bán kính", {"osm": "node/10"}, 16.4698, 107.6733),
+        # ~50 km về phía bắc tâm — rõ ràng ngoài bán kính thật, nhưng sẽ
+        # (sai) được tính là "trong bán kính" nếu code quên cast
+        # `::geography` (so khớp khoảng cách theo độ thay vì mét, ngưỡng
+        # 15000 lúc đó lớn hơn mọi khoảng cách tính bằng độ) hoặc đảo
+        # lat/lon khi dựng ST_MakePoint.
+        PlaceRecord("Ngoài bán kính", {"osm": "node/11"}, 16.9194, 107.5796),
+    ])
+    by_name = {m.name: m for m in collect_metrics(db_conn, CFG)}
+    metric = by_name["Tọa độ hợp lệ trong lõi Huế"]
+    assert metric.value == 0.5
+    assert metric.passed is False
+
+
+def test_collect_metrics_opening_hours_denominator_is_three_categories(db_conn):
+    hours = {"mon": [["07:00", "17:00"]]}
+    upsert_places(db_conn, [
+        PlaceRecord("Di tích có giờ", {"osm": "node/20"}, 16.47, 107.58,
+                     category="di_tich", opening_hours=hours),
+        PlaceRecord("Di tích chưa parse", {"osm": "node/21"}, 16.47, 107.58,
+                     category="di_tich"),
+        PlaceRecord("Bảo tàng có giờ", {"osm": "node/22"}, 16.47, 107.58,
+                     category="bao_tang", opening_hours=hours),
+        PlaceRecord("Lăng tẩm chưa parse", {"osm": "node/23"}, 16.47, 107.58,
+                     category="lang_tam"),
+        # Ngoài 3 category — có giờ mở cửa nhưng KHÔNG được tính vào mẫu số
+        # lẫn tử số; nếu vô tình lọt vào sẽ đổi kết quả 0.5 thành 0.6 (3/5).
+        PlaceRecord("Chùa có giờ", {"osm": "node/24"}, 16.47, 107.58,
+                     category="chua", opening_hours=hours),
+    ])
+    by_name = {m.name: m for m in collect_metrics(db_conn, CFG)}
+    metric = by_name["Di tích, bảo tàng, lăng tẩm có opening_hours parse được"]
+    assert metric.value == 0.5
+    assert metric.passed is True
+
+
+def test_render_report_includes_required_notes():
+    metrics = [
+        Metric("Tên chỉ số bất kỳ", 0.08, 0.05, True, key="opening_hours"),
+        Metric("Tên chỉ số bất kỳ khác", 0, 100, False, key="manual_label"),
+    ]
+    text = render_report(metrics, merge_review_rows=0)
+    assert OPENING_HOURS_NOTE in text
+    assert MANUAL_LABEL_NOTE in text
+
+
+def test_render_report_omits_notes_without_matching_key():
+    metrics = [Metric("Chỉ số không liên quan", 1.0, 0.98, True)]
+    text = render_report(metrics, merge_review_rows=0)
+    assert OPENING_HOURS_NOTE not in text
+    assert MANUAL_LABEL_NOTE not in text
