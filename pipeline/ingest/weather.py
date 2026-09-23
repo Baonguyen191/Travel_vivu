@@ -12,6 +12,14 @@ HOURLY = ("temperature_2m,precipitation_probability,precipitation,"
           "wind_speed_10m,uv_index,weather_code")
 DAILY = "temperature_2m_mean,precipitation_sum,wind_speed_10m_max"
 RAIN_DAY_MM = 1.0
+MIN_INTERVAL = 1.0
+
+
+def _utc_offset_suffix(utc_offset_seconds: int) -> str:
+    sign = "+" if utc_offset_seconds >= 0 else "-"
+    total_minutes = abs(utc_offset_seconds) // 60
+    hours, minutes = divmod(total_minutes, 60)
+    return f"{sign}{hours:02d}:{minutes:02d}"
 
 
 def grid_points(cfg: CityConfig, step: float = 0.1) -> list[tuple[float, float]]:
@@ -29,10 +37,11 @@ def grid_points(cfg: CityConfig, step: float = 0.1) -> list[tuple[float, float]]
 
 def parse_forecast(payload: dict) -> list[dict]:
     h = payload["hourly"]
+    suffix = _utc_offset_suffix(payload.get("utc_offset_seconds", 0))
     rows = []
     for i, stamp in enumerate(h["time"]):
         rows.append({
-            "forecast_time": stamp,
+            "forecast_time": f"{stamp}{suffix}",
             "temperature": h["temperature_2m"][i],
             "precip_prob": h["precipitation_probability"][i],
             "precip_mm": h["precipitation"][i],
@@ -54,21 +63,30 @@ def parse_normals(payload: dict) -> list[dict]:
         buckets[month]["precip"].append(d["precipitation_sum"][i])
         buckets[month]["wind"].append(d["wind_speed_10m_max"][i])
 
+    def _avg(values: list) -> float | None:
+        present = [v for v in values if v is not None]
+        return sum(present) / len(present) if present else None
+
     rows = []
     for month, values in sorted(buckets.items()):
         precip = values["precip"]
+        precip_present = [v for v in precip if v is not None]
+        rain_days = (
+            sum(1 for v in precip_present if v >= RAIN_DAY_MM) / len(precip_present)
+            if precip_present else None
+        )
         rows.append({
             "month": month,
-            "temp_avg": sum(values["temp"]) / len(values["temp"]),
-            "precip_mm_avg": sum(precip) / len(precip),
-            "rain_days": sum(1 for v in precip if v >= RAIN_DAY_MM) / len(precip),
-            "wind_avg": sum(values["wind"]) / len(values["wind"]),
+            "temp_avg": _avg(values["temp"]),
+            "precip_mm_avg": _avg(precip),
+            "rain_days": rain_days,
+            "wind_avg": _avg(values["wind"]),
         })
     return rows
 
 
 def run(conn, cfg: CityConfig, force: bool = False) -> int:
-    fetcher = Fetcher(conn, "open_meteo", min_interval=1.0)
+    fetcher = Fetcher(conn, "open_meteo", min_interval=MIN_INTERVAL)
     written = 0
     for lat, lon in grid_points(cfg):
         try:
@@ -78,6 +96,34 @@ def run(conn, cfg: CityConfig, force: bool = False) -> int:
                         "forecast_days": 16, "timezone": "Asia/Bangkok"},
                 force=force,
             )
+        except httpx.HTTPStatusError as exc:
+            print(
+                f"weather: bỏ qua dự báo ô lưới ({lat}, {lon}) —"
+                f" lỗi HTTP {exc.response.status_code}"
+            )
+        except httpx.TimeoutException:
+            print(f"weather: bỏ qua dự báo ô lưới ({lat}, {lon}) — timeout")
+        else:
+            for row in parse_forecast(json.loads(forecast.content)):
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO weather_cache (lat_grid, lon_grid, forecast_time,"
+                        " temperature, precip_prob, precip_mm, wind_speed, uv_index,"
+                        " weather_code, fetched_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,now())"
+                        " ON CONFLICT (lat_grid, lon_grid, forecast_time) DO UPDATE SET"
+                        " temperature = EXCLUDED.temperature,"
+                        " precip_prob = EXCLUDED.precip_prob,"
+                        " precip_mm = EXCLUDED.precip_mm,"
+                        " wind_speed = EXCLUDED.wind_speed,"
+                        " uv_index = EXCLUDED.uv_index,"
+                        " weather_code = EXCLUDED.weather_code, fetched_at = now()",
+                        (lat, lon, row["forecast_time"], row["temperature"],
+                         row["precip_prob"], row["precip_mm"], row["wind_speed"],
+                         row["uv_index"], row["weather_code"]),
+                    )
+                    written += 1
+
+        try:
             archive = fetcher.fetch(
                 ARCHIVE_URL,
                 params={"latitude": lat, "longitude": lon, "start_date": "1991-01-01",
@@ -86,32 +132,13 @@ def run(conn, cfg: CityConfig, force: bool = False) -> int:
             )
         except httpx.HTTPStatusError as exc:
             print(
-                f"weather: bỏ qua ô lưới ({lat}, {lon}) —"
+                f"weather: bỏ qua khí hậu ô lưới ({lat}, {lon}) —"
                 f" lỗi HTTP {exc.response.status_code}"
             )
             continue
         except httpx.TimeoutException:
-            print(f"weather: bỏ qua ô lưới ({lat}, {lon}) — timeout")
+            print(f"weather: bỏ qua khí hậu ô lưới ({lat}, {lon}) — timeout")
             continue
-
-        for row in parse_forecast(json.loads(forecast.content)):
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO weather_cache (lat_grid, lon_grid, forecast_time,"
-                    " temperature, precip_prob, precip_mm, wind_speed, uv_index,"
-                    " weather_code, fetched_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,now())"
-                    " ON CONFLICT (lat_grid, lon_grid, forecast_time) DO UPDATE SET"
-                    " temperature = EXCLUDED.temperature,"
-                    " precip_prob = EXCLUDED.precip_prob,"
-                    " precip_mm = EXCLUDED.precip_mm,"
-                    " wind_speed = EXCLUDED.wind_speed,"
-                    " uv_index = EXCLUDED.uv_index,"
-                    " weather_code = EXCLUDED.weather_code, fetched_at = now()",
-                    (lat, lon, row["forecast_time"], row["temperature"],
-                     row["precip_prob"], row["precip_mm"], row["wind_speed"],
-                     row["uv_index"], row["weather_code"]),
-                )
-                written += 1
 
         for row in parse_normals(json.loads(archive.content)):
             with conn.cursor() as cur:
