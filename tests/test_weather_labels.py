@@ -28,10 +28,23 @@ def test_layer1_unknown_category_uses_khac():
     assert apply_labels(place, DEFAULTS, {}).indoor_ratio == 0.5
 
 
-def test_layer2_building_tag_raises_indoor_ratio():
+def test_layer2_building_tag_raises_indoor_ratio_when_category_already_indoor():
+    place = PlaceRecord("Bảo tàng", {"osm": "node/3"}, 16.4, 107.5,
+                        category="bao_tang", tags={"building": "yes"})
+    assert apply_labels(place, DEFAULTS, {}).indoor_ratio == 0.9
+
+
+def test_layer2_building_tag_skipped_for_outdoor_category():
+    """building=yes trên OSM chỉ nghĩa là 'có công trình xây', không nghĩa là
+    'trải nghiệm chủ yếu trong nhà'. Ngọ Môn, lăng tẩm... đều có building=yes
+    trên một phần công trình nhưng vẫn là điểm tham quan ngoài trời — nếu
+    layer 2 lật indoor_ratio lên 0.9 trong khi weather_sensitivity.rain vẫn
+    là 0.8 (theo category lang_tam), hai trường mâu thuẫn nhau."""
     place = PlaceRecord("Lăng", {"osm": "node/3"}, 16.4, 107.5,
                         category="lang_tam", tags={"building": "yes"})
-    assert apply_labels(place, DEFAULTS, {}).indoor_ratio == 0.9
+    out = apply_labels(place, DEFAULTS, {})
+    assert out.indoor_ratio == 0.25
+    assert out.weather_sensitivity["rain"] == 0.8
 
 
 def test_layer2_park_tag_lowers_indoor_ratio():

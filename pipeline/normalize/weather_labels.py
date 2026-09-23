@@ -4,10 +4,24 @@ from dataclasses import replace
 
 import yaml
 
-INDOOR_TAG_RULES = [
+# Điều chỉnh TĂNG indoor_ratio: OSM dùng building=yes cho bất kỳ công trình
+# có mái/tường nào, không phân biệt "có che chắn" với "là điểm tham quan
+# trong nhà" — Ngọ Môn, Cửa Quảng Đức, lăng tẩm đều có building=yes trên một
+# phần công trình dù phần lớn trải nghiệm là ngoài trời. Chỉ áp dụng các quy
+# tắc này khi category mặc định đã nghiêng về trong nhà (>= 0.5): nếu
+# category mặc định đã là ngoài trời (di_tich, lang_tam, chua, cong_vien),
+# một tag building=yes lẻ tẻ không đủ để lật ngược bản chất ngoài trời đó —
+# và làm vậy sẽ khiến indoor_ratio mâu thuẫn với weather_sensitivity.rain
+# vốn vẫn lấy theo category.
+UPWARD_INDOOR_TAG_RULES = [
     ({"building": "yes"}, 0.9),
     ({"indoor": "yes"}, 0.9),
     ({"covered": "yes"}, 0.6),
+]
+
+# Điều chỉnh GIẢM indoor_ratio: park/garden/natural luôn đáng tin — không
+# category nào có "công viên có mái" — nên áp dụng vô điều kiện.
+DOWNWARD_INDOOR_TAG_RULES = [
     ({"leisure": "park"}, 0.05),
     ({"leisure": "garden"}, 0.05),
     ({"natural": "*"}, 0.05),
@@ -81,8 +95,8 @@ def load_overrides(path: str = "config/overrides.csv") -> dict[str, dict]:
     return result
 
 
-def _indoor_from_tags(tags: dict) -> float | None:
-    for match, value in INDOOR_TAG_RULES:
+def _match_indoor_rules(tags: dict, rules: list[tuple[dict, float]]) -> float | None:
+    for match, value in rules:
         for key, expected in match.items():
             tag = tags.get(key)
             if tag is not None and (expected == "*" or tag == expected):
@@ -102,9 +116,13 @@ def apply_labels(place, defaults: dict, overrides: dict):
         label_source="default",
     )
 
-    from_tags = _indoor_from_tags(place.tags)
-    if from_tags is not None:
-        updated = replace(updated, indoor_ratio=from_tags)
+    downward = _match_indoor_rules(place.tags, DOWNWARD_INDOOR_TAG_RULES)
+    if downward is not None:
+        updated = replace(updated, indoor_ratio=downward)
+    elif base["indoor_ratio"] >= 0.5:
+        upward = _match_indoor_rules(place.tags, UPWARD_INDOOR_TAG_RULES)
+        if upward is not None:
+            updated = replace(updated, indoor_ratio=upward)
 
     for key in place.external_ids:
         entry = overrides.get(f"{key}:{place.external_ids[key]}")
