@@ -1,4 +1,5 @@
 import argparse
+import importlib
 
 from pipeline import db
 
@@ -11,56 +12,82 @@ INGEST_MODULES = {
     "weather": "pipeline.ingest.weather",
 }
 
+# Thứ tự chạy của lệnh `all`. boundary/wikidata/osm phải chạy trước
+# normalize và load (chúng cấp nguyên liệu cho normalize). wikipedia và
+# commons cần places đã có id nên chạy sau load. weather độc lập với các
+# place, nên chạy sau cùng.
+PIPELINE_ORDER = [
+    "migrate",
+    "boundary",
+    "wikidata",
+    "osm",
+    "normalize",
+    "load",
+    "wikipedia",
+    "commons",
+    "weather",
+    "qa",
+]
+
+
+def _run_step(step: str, conn, force: bool = False) -> int:
+    if step == "migrate":
+        applied = db.run_migrations(conn)
+        print(f"Đã chạy {len(applied)} migration: {', '.join(applied) or 'không có'}")
+        return 0
+
+    from pipeline.config import load_city
+
+    cfg = load_city()
+
+    if step == "qa":
+        from pipeline.qa import coverage
+
+        coverage.run(conn, cfg)
+        return 0
+
+    if step in {"normalize", "load"}:
+        from pipeline.load.upsert import upsert_places
+        from pipeline.normalize import pipeline as normalize_pipeline
+
+        places, review, _dropped = normalize_pipeline.run(conn, cfg)
+        print(f"normalize: {len(places)} địa điểm, {len(review)} cặp chờ xem tay")
+        if step == "load":
+            inserted, updated = upsert_places(conn, places)
+            print(f"load: thêm {inserted}, cập nhật {updated}")
+        return 0
+
+    if step not in INGEST_MODULES:
+        valid = ", ".join(sorted(INGEST_MODULES))
+        print(f"Nguồn không hợp lệ: '{step}'. Các nguồn hợp lệ: {valid}")
+        return 1
+
+    module = importlib.import_module(INGEST_MODULES[step])
+    count = module.run(conn, cfg, force=force)
+    print(f"{step}: {count} bản ghi")
+    return 0
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("migrate")
+    for name in ("migrate", "normalize", "load", "qa", "all"):
+        sub.add_parser(name)
     ingest = sub.add_parser("ingest")
     ingest.add_argument("--source", required=True)
     ingest.add_argument("--force", action="store_true")
-    sub.add_parser("normalize")
-    sub.add_parser("load")
-    sub.add_parser("qa")
     args = parser.parse_args()
 
-    if args.command == "migrate":
-        conn = db.connect()
-        applied = db.run_migrations(conn)
-        print(f"Đã chạy {len(applied)} migration: {', '.join(applied) or 'không có'}")
-    elif args.command == "ingest":
-        import importlib
-
-        from pipeline.config import load_city
-
-        if args.source not in INGEST_MODULES:
-            valid = ", ".join(sorted(INGEST_MODULES))
-            print(f"Nguồn không hợp lệ: '{args.source}'. Các nguồn hợp lệ: {valid}")
-            return 1
-
-        module = importlib.import_module(INGEST_MODULES[args.source])
-        conn = db.connect()
-        count = module.run(conn, load_city(), force=args.force)
-        print(f"{args.source}: {count} bản ghi")
-    elif args.command in {"normalize", "load"}:
-        from pipeline.config import load_city
-        from pipeline.load.upsert import upsert_places
-        from pipeline.normalize import pipeline as normalize_pipeline
-
-        conn = db.connect()
-        cfg = load_city()
-        places, review, _dropped = normalize_pipeline.run(conn, cfg)
-        print(f"normalize: {len(places)} địa điểm, {len(review)} cặp chờ xem tay")
-        if args.command == "load":
-            inserted, updated = upsert_places(conn, places)
-            print(f"load: thêm {inserted}, cập nhật {updated}")
-    elif args.command == "qa":
-        from pipeline.config import load_city
-        from pipeline.qa import coverage
-
-        conn = db.connect()
-        coverage.run(conn, load_city())
-    return 0
+    conn = db.connect()
+    if args.command == "all":
+        for step in PIPELINE_ORDER:
+            status = _run_step(step, conn)
+            if status != 0:
+                return status
+        return 0
+    if args.command == "ingest":
+        return _run_step(args.source, conn, force=args.force)
+    return _run_step(args.command, conn)
 
 
 if __name__ == "__main__":
