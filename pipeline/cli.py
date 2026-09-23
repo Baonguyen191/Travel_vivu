@@ -49,6 +49,12 @@ def _run_step(step: str, conn, force: bool = False) -> int:
         coverage.run(conn, cfg)
         return 0
 
+    if step == "label-agreement":
+        from pipeline.qa import label_agreement
+
+        label_agreement.run(conn, cfg)
+        return 0
+
     if step in {"normalize", "load"}:
         from pipeline.load.upsert import upsert_places
         from pipeline.normalize import pipeline as normalize_pipeline
@@ -74,7 +80,7 @@ def _run_step(step: str, conn, force: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("migrate", "normalize", "load", "qa", "all"):
+    for name in ("migrate", "normalize", "load", "qa", "label-agreement", "all"):
         sub.add_parser(name)
     ingest = sub.add_parser("ingest")
     ingest.add_argument("--source", required=True)
