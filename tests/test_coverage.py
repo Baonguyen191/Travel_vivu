@@ -2,6 +2,7 @@ from pipeline.config import CityConfig
 from pipeline.load.upsert import upsert_places
 from pipeline.models import PlaceRecord
 from pipeline.qa.coverage import (
+    BOUNDARY_MISSING_NOTE,
     MANUAL_LABEL_NOTE,
     OPENING_HOURS_NOTE,
     Metric,
@@ -66,23 +67,50 @@ def test_collect_metrics_wikidata_image_coverage(db_conn):
     assert metric.passed is True
 
 
-def test_collect_metrics_coordinate_inside_core_radius(db_conn):
+def test_collect_metrics_coordinate_inside_administrative_boundary(db_conn, tmp_path):
+    # Trước fix này, "trong lõi Huế" nghĩa là "trong core_radius_km quanh
+    # core_center" — CHÍNH XÁC vị từ mà normalize/pipeline.py (within_core)
+    # đã dùng để lọc dữ liệu trước khi nạp vào DB, nên chỉ số này luôn ra
+    # ~100% một cách cấu trúc, không đo được gì thật. Test này kiểm bằng một
+    # ranh giới hành chính thật (ST_Within trên polygon), độc lập với bước
+    # lọc dữ liệu.
+    wkt_path = tmp_path / "boundary.wkt"
+    wkt_path.write_text(
+        "POLYGON((107.53 16.42, 107.63 16.42, 107.63 16.52, 107.53 16.52,"
+        " 107.53 16.42))",
+        encoding="utf-8",
+    )
+    cfg = CityConfig("Huế", (16.335, 107.435, 16.605, 107.725), (16.4698, 107.5796),
+                      15.0, polygon_path=str(wkt_path))
     upsert_places(db_conn, [
-        # ~10 km về phía đông tâm — trong bán kính thật (15 km), nhưng sẽ bị
-        # loại nếu code lấy sai đơn vị bán kính (km thay vì mét, tức 15 m
-        # thay vì 15000 m).
-        PlaceRecord("Trong bán kính", {"osm": "node/10"}, 16.4698, 107.6733),
-        # ~50 km về phía bắc tâm — rõ ràng ngoài bán kính thật, nhưng sẽ
-        # (sai) được tính là "trong bán kính" nếu code quên cast
-        # `::geography` (so khớp khoảng cách theo độ thay vì mét, ngưỡng
-        # 15000 lúc đó lớn hơn mọi khoảng cách tính bằng độ) hoặc đảo
-        # lat/lon khi dựng ST_MakePoint.
-        PlaceRecord("Ngoài bán kính", {"osm": "node/11"}, 16.9194, 107.5796),
+        # Bên trong hình vuông ranh giới ở trên.
+        PlaceRecord("Trong ranh giới", {"osm": "node/10"}, 16.47, 107.58),
+        # ~50 km về phía bắc — rõ ràng ngoài ranh giới.
+        PlaceRecord("Ngoài ranh giới", {"osm": "node/11"}, 16.9194, 107.5796),
     ])
-    by_name = {m.name: m for m in collect_metrics(db_conn, CFG)}
-    metric = by_name["Tọa độ hợp lệ trong lõi Huế"]
+    by_name = {m.name: m for m in collect_metrics(db_conn, cfg)}
+    metric = by_name["Tọa độ nằm trong ranh giới hành chính Huế"]
     assert metric.value == 0.5
     assert metric.passed is False
+    assert metric.informational is False
+
+
+def test_collect_metrics_skips_boundary_metric_when_file_missing(db_conn):
+    cfg = CityConfig("Huế", (16.335, 107.435, 16.605, 107.725), (16.4698, 107.5796),
+                      15.0, polygon_path="data/generated/khong_ton_tai_thuc.wkt")
+    upsert_places(db_conn, [PlaceRecord("A", {"osm": "node/1"}, 16.47, 107.58)])
+    by_name = {m.name: m for m in collect_metrics(db_conn, cfg)}
+    metric = by_name["Tọa độ nằm trong ranh giới hành chính Huế"]
+    assert metric.informational is True
+    text = render_report([metric], merge_review_rows=0)
+    assert BOUNDARY_MISSING_NOTE in text
+
+
+def test_collect_metrics_skips_boundary_metric_when_polygon_path_unset(db_conn):
+    upsert_places(db_conn, [PlaceRecord("A", {"osm": "node/1"}, 16.47, 107.58)])
+    by_name = {m.name: m for m in collect_metrics(db_conn, CFG)}
+    metric = by_name["Tọa độ nằm trong ranh giới hành chính Huế"]
+    assert metric.informational is True
 
 
 def test_collect_metrics_opening_hours_denominator_is_three_categories(db_conn):

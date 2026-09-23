@@ -19,6 +19,12 @@ MANUAL_LABEL_NOTE = (
     " config/overrides.csv — đây là lời nhắc về việc còn tồn đọng, không phải"
     " lỗi cần che giấu."
 )
+BOUNDARY_MISSING_NOTE = (
+    "Chỉ số 'Tọa độ nằm trong ranh giới hành chính Huế' bị bỏ qua vì không"
+    " tìm thấy file ranh giới (polygon_path trong config/city_hue.yml) —"
+    " chạy `python -m pipeline.cli ingest --source boundary` để sinh file"
+    " đó trước khi chỉ số này có ý nghĩa."
+)
 
 
 @dataclass
@@ -36,24 +42,45 @@ def _count(cur, sql: str, params: tuple = ()) -> int:
     return cur.fetchone()[0]
 
 
-def collect_metrics(conn, cfg) -> list[Metric]:
-    lat, lon = cfg.core_center
-    radius_m = cfg.core_radius_km * 1000
+def _load_boundary_wkt(cfg) -> str | None:
+    """Đọc WKT ranh giới hành chính từ `cfg.polygon_path`, hoặc None nếu
+    chưa cấu hình đường dẫn hay file chưa tồn tại (chưa chạy `boundary`)."""
+    path = getattr(cfg, "polygon_path", None)
+    if not path:
+        return None
+    file = Path(path)
+    if not file.exists():
+        return None
+    return file.read_text(encoding="utf-8").strip()
 
+
+def collect_metrics(conn, cfg) -> list[Metric]:
     with conn.cursor() as cur:
         total = _count(cur, "SELECT count(*) FROM places")
 
-        inside = _count(
-            cur,
-            "SELECT count(*) FROM places WHERE location IS NOT NULL"
-            " AND ST_DWithin(location,"
-            " ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography, %s)",
-            (lon, lat, radius_m),
-        )
-        value = inside / total if total else 0.0
-        coord_metric = Metric(
-            "Tọa độ hợp lệ trong lõi Huế", value, 0.98, value >= 0.98
-        )
+        # Trước fix này, "trong lõi Huế" nghĩa là "trong bán kính core_radius_km
+        # quanh core_center" — CHÍNH XÁC cùng vị từ mà normalize/pipeline.py đã
+        # dùng để lọc dữ liệu đầu vào (within_core), nên chỉ số này cấu trúc
+        # luôn là ~100% bất kể chất lượng tọa độ thật sự, không đo được gì.
+        # Đổi sang kiểm thật: nằm trong ranh giới hành chính Huế lấy từ
+        # Overpass (`boundary`), một vị từ độc lập với bước lọc dữ liệu.
+        wkt = _load_boundary_wkt(cfg)
+        if wkt is None:
+            coord_metric = Metric(
+                "Tọa độ nằm trong ranh giới hành chính Huế", 0.0, None, True,
+                informational=True, key="boundary_missing",
+            )
+        else:
+            inside = _count(
+                cur,
+                "SELECT count(*) FROM places WHERE location IS NOT NULL"
+                " AND ST_Within(location::geometry, ST_GeomFromText(%s, 4326))",
+                (wkt,),
+            )
+            value = inside / total if total else 0.0
+            coord_metric = Metric(
+                "Tọa độ nằm trong ranh giới hành chính Huế", value, 0.98, value >= 0.98
+            )
 
         categorized = _count(
             cur, "SELECT count(*) FROM places WHERE category <> 'khac'"
@@ -147,6 +174,8 @@ def render_report(metrics: list[Metric], merge_review_rows: int) -> str:
         lines.append(OPENING_HOURS_NOTE)
     if "manual_label" in keys:
         lines.append(MANUAL_LABEL_NOTE)
+    if "boundary_missing" in keys:
+        lines.append(BOUNDARY_MISSING_NOTE)
 
     return "\n".join(lines) + "\n"
 
