@@ -21,6 +21,7 @@ def main() -> int:
     ingest.add_argument("--force", action="store_true")
     sub.add_parser("normalize")
     sub.add_parser("load")
+    sub.add_parser("qa")
     args = parser.parse_args()
 
     if args.command == "migrate":
@@ -53,6 +54,12 @@ def main() -> int:
         if args.command == "load":
             inserted, updated = upsert_places(conn, places)
             print(f"load: thêm {inserted}, cập nhật {updated}")
+    elif args.command == "qa":
+        from pipeline.config import load_city
+        from pipeline.qa import coverage
+
+        conn = db.connect()
+        coverage.run(conn, load_city())
     return 0
 
 
