@@ -93,6 +93,16 @@ def test_khach_san_and_don_vi_hanh_chinh_have_no_avg_visit_minutes():
     assert apply_labels(ward, defaults, {}).avg_visit_minutes is None
 
 
+def test_khac_category_has_no_avg_visit_minutes():
+    """'khac' gom cả bản ghi không phải điểm dừng thật: triều đại, sự kiện,
+    ngai vàng, một vùng địa lý, ga xe lửa... avg_visit_minutes = 45 cho
+    nhóm này khiến bộ lập lịch coi chúng như điểm dừng schedule được. Cùng
+    tín hiệu None đã dùng cho khach_san/don_vi_hanh_chinh."""
+    defaults = load_weather_defaults("config/weather_defaults.yml")
+    place = PlaceRecord("Sự kiện gì đó", {"wikidata": "Q1"}, 16.4, 107.5, category="khac")
+    assert apply_labels(place, defaults, {}).avg_visit_minutes is None
+
+
 def test_layer3_override_matches_second_external_id():
     """place_key có thể khớp theo bất kỳ external id nào của bản ghi đã ghép,
     không chỉ id đầu tiên trong dict."""
