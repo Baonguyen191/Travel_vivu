@@ -22,12 +22,19 @@ def _utc_offset_suffix(utc_offset_seconds: int) -> str:
     return f"{sign}{hours:02d}:{minutes:02d}"
 
 
+def grid_key(lat: float, lon: float, step: float = 0.1) -> tuple[float, float]:
+    """Làm tròn một toạ độ về điểm lưới ~`step` độ — một nơi duy nhất cho quy
+    ước làm tròn, dùng cả khi liệt kê lưới (`grid_points`) lẫn khi tra cache
+    thời tiết theo toạ độ một địa điểm bất kỳ."""
+    return (round(round(lat / step) * step, 1), round(round(lon / step) * step, 1))
+
+
 def grid_points(cfg: CityConfig, step: float = 0.1) -> list[tuple[float, float]]:
     south, west, north, east = cfg.bbox
     points = []
-    lat = round(round(south / step) * step, 1)
+    lat, _ = grid_key(south, west, step)
     while lat <= north + step / 2:
-        lon = round(round(west / step) * step, 1)
+        _, lon = grid_key(lat, west, step)
         while lon <= east + step / 2:
             points.append((lat, lon))
             lon = round(lon + step, 1)
