@@ -9,7 +9,7 @@ from pipeline.normalize.category import load_category_rules, map_category
 from pipeline.normalize.merge import merge_places, within_core
 from pipeline.normalize.opening_hours import parse_opening_hours
 from pipeline.normalize.weather_labels import (
-    apply_labels, load_overrides, load_weather_defaults,
+    apply_labels, load_overrides, load_weather_defaults, warn_unmatched_overrides,
 )
 
 MERGE_REVIEW_PATH = "data/qa/merge_review.csv"
@@ -34,16 +34,18 @@ def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict], int]:
 
     result = []
     dropped = 0
+    matched_override_keys: set[str] = set()
     for place in places:
         place.category = map_category(place.tags, place.wikidata_classes, rules)
         if place.category == ADMIN_CATEGORY:
             dropped += 1
             continue
         place.opening_hours = parse_opening_hours(place.opening_hours_raw)
-        result.append(apply_labels(place, defaults, overrides))
+        result.append(apply_labels(place, defaults, overrides, matched_override_keys))
 
     if dropped:
         print(f"normalize: bỏ qua {dropped} đơn vị hành chính")
+    warn_unmatched_overrides(overrides, matched_override_keys)
 
     Path(MERGE_REVIEW_PATH).parent.mkdir(parents=True, exist_ok=True)
     fields = ["wikidata_id", "osm_id", "wikidata_name", "osm_name", "distance_m", "reason"]

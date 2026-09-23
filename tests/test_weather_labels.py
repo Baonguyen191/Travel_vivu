@@ -1,5 +1,7 @@
 from pipeline.models import PlaceRecord
-from pipeline.normalize.weather_labels import apply_labels, load_overrides, load_weather_defaults
+from pipeline.normalize.weather_labels import (
+    apply_labels, load_overrides, load_weather_defaults, warn_unmatched_overrides,
+)
 
 DEFAULTS = {
     "bao_tang": {"indoor_ratio": 0.95, "avg_visit_minutes": 60,
@@ -160,6 +162,38 @@ def test_load_overrides_skips_malformed_value_but_keeps_rest_of_row(tmp_path, ca
     assert "wikidata:Q3" in warning
     assert "indoor_ratio" in warning
     assert "khong_phai_so" in warning
+
+
+def test_apply_labels_records_matched_override_key():
+    place = PlaceRecord("Lăng Tự Đức", {"wikidata": "Q1"}, 16.4, 107.5, category="lang_tam")
+    overrides = {"wikidata:Q1": {"indoor_ratio": 0.15}}
+    matched: set[str] = set()
+    apply_labels(place, DEFAULTS, overrides, matched)
+    assert matched == {"wikidata:Q1"}
+
+
+def test_apply_labels_does_not_record_when_no_override_matches():
+    place = PlaceRecord("X", {"wikidata": "Q99"}, 16.4, 107.5, category="lang_tam")
+    overrides = {"wikidata:Q1": {"indoor_ratio": 0.15}}
+    matched: set[str] = set()
+    apply_labels(place, DEFAULTS, overrides, matched)
+    assert matched == set()
+
+
+def test_warn_unmatched_overrides_reports_key_that_matched_nothing(capsys):
+    """Một QID gõ sai trong overrides.csv (ví dụ đã bị đổi/không tồn tại)
+    khiến tầng 3 im lặng không bao giờ chạy — đây là lỗi thật đã xảy ra với
+    dòng mẫu Q1140380. Cảnh báo phải nêu rõ khoá nào không khớp."""
+    overrides = {"wikidata:Q1": {}, "wikidata:Q999999": {}}
+    unmatched = warn_unmatched_overrides(overrides, {"wikidata:Q1"})
+    assert unmatched == ["wikidata:Q999999"]
+    assert "wikidata:Q999999" in capsys.readouterr().out
+
+
+def test_warn_unmatched_overrides_silent_when_all_matched(capsys):
+    unmatched = warn_unmatched_overrides({"wikidata:Q1": {}}, {"wikidata:Q1"})
+    assert unmatched == []
+    assert capsys.readouterr().out == ""
 
 
 def test_load_overrides_skips_row_with_no_usable_fields(tmp_path, capsys):

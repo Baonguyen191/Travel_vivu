@@ -104,7 +104,7 @@ def _match_indoor_rules(tags: dict, rules: list[tuple[dict, float]]) -> float | 
     return None
 
 
-def apply_labels(place, defaults: dict, overrides: dict):
+def apply_labels(place, defaults: dict, overrides: dict, matched_keys: set | None = None):
     base = defaults.get(place.category) or defaults["khac"]
     updated = replace(
         place,
@@ -125,9 +125,31 @@ def apply_labels(place, defaults: dict, overrides: dict):
             updated = replace(updated, indoor_ratio=upward)
 
     for key in place.external_ids:
-        entry = overrides.get(f"{key}:{place.external_ids[key]}")
+        place_key = f"{key}:{place.external_ids[key]}"
+        entry = overrides.get(place_key)
         if entry:
+            if matched_keys is not None:
+                matched_keys.add(place_key)
             copied = {k: (list(v) if isinstance(v, list) else v) for k, v in entry.items()}
             updated = replace(updated, label_source="manual", **copied)
             break
     return updated
+
+
+def warn_unmatched_overrides(overrides: dict, matched_keys: set) -> list[str]:
+    """Trả về (và in cảnh báo tiếng Việt cho) các khoá override không khớp
+    bất kỳ place nào sau khi chạy hết pipeline.
+
+    `config/overrides.csv` là file người nhập tay — một QID gõ sai (hoặc đã
+    đổi) khiến tầng 3 của bộ gán nhãn im lặng không bao giờ chạy cho dòng đó,
+    và các chỉ số QA đọc `label_source == 'manual'` sẽ ngầm sai mà không ai
+    biết. Trả về danh sách để test kiểm tra được, đồng thời in cảnh báo cho
+    người chạy CLI thấy ngay.
+    """
+    unmatched = sorted(set(overrides) - matched_keys)
+    if unmatched:
+        print(
+            "Cảnh báo: các khoá sau trong config/overrides.csv không khớp"
+            f" place nào: {', '.join(unmatched)}"
+        )
+    return unmatched
