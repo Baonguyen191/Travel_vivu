@@ -70,16 +70,19 @@ Lệnh `all` chạy tuần tự theo `pipeline.cli.PIPELINE_ORDER`:
 | `boundary` | Lấy ranh giới hành chính Huế từ Overpass, ghi `data/generated/city_hue_boundary.wkt`, cập nhật `config/city_hue.yml` |
 | `wikidata` | Truy vấn SPARQL Wikidata trong bbox Huế, lưu bản thô vào `data/raw/wikidata/` |
 | `osm` | Truy vấn Overpass lấy địa danh/quán ăn/khách sạn trong bbox, lưu `data/raw/osm/` |
-| `normalize` | Gộp Wikidata + OSM theo rule-based (category, opening_hours, mặc định thời tiết theo category, `config/overrides.csv`), sinh danh sách place đã chuẩn hoá + cặp nghi trùng chờ xem tay |
-| `load` | Upsert danh sách trên vào bảng `places` (và bảng liên kết) |
+| `load` | Gộp Wikidata + OSM theo rule-based (category, opening_hours, mặc định thời tiết theo category, `config/overrides.csv`) — tức chạy đúng một lượt bước `normalize` — rồi upsert kết quả vào bảng `places` (và bảng liên kết) |
 | `wikipedia` | Với mỗi place đã có `id` trong DB, lấy tóm tắt Wikipedia, cắt đoạn (chunk) cho RAG (`place_chunks`) |
 | `commons` | Với mỗi place đã có `id`, lấy ảnh tham chiếu từ Wikimedia Commons (`place_images`) |
 | `weather` | Nạp dự báo giờ (Open-Meteo forecast) và khí hậu trung bình nhiều năm (Open-Meteo archive) theo lưới toạ độ ~0.1 độ, độc lập với place nên chạy sau cùng |
 | `qa` | In báo cáo chất lượng dữ liệu (coverage, ngưỡng PASS/FAIL) |
 
 Thứ tự này bắt buộc vì `wikipedia`/`commons` cần `places.id` (chỉ có sau
-`load`), còn `boundary`/`wikidata`/`osm` phải chạy trước `normalize`/`load`
-vì chúng là nguyên liệu đầu vào.
+`load`), còn `boundary`/`wikidata`/`osm` phải chạy trước `load` vì chúng là
+nguyên liệu đầu vào. `normalize` **không** nằm trong `all`: bản thân `load`
+đã chạy đúng một lượt normalize rồi upsert, nên đưa cả hai vào `PIPELINE_ORDER`
+sẽ tính lại toàn bộ bước gộp/nhãn hai lần cho cùng một dữ liệu. `normalize`
+vẫn còn là lệnh đứng riêng — dùng khi chỉ muốn xem báo cáo gộp/cặp nghi trùng
+mà chưa ghi gì vào DB.
 
 Mỗi lệnh **an toàn để chạy lại nhiều lần**: `Fetcher` cache bản thô theo hash
 request trong `data/raw/`, migration chỉ áp phần chưa chạy, `load` dùng
@@ -107,13 +110,15 @@ python -m pipeline.cli ingest --source osm --force
 
 Số liệu dưới đây lấy từ CSDL Huế đã tích luỹ qua các lần chạy `ingest` +
 `normalize` + `load` + `wikipedia`/`commons`/`weather` (task 1–15), rồi xác
-nhận lại bằng một lần chạy `python -m pipeline.cli all` đầy đủ trên chính
+nhận lại bằng hai lần chạy `python -m pipeline.cli all` đầy đủ trên chính
 CSDL đó (không rebuild từ đầu — xem mục "Chạy lại từ đầu" bên dưới về vì sao
-và cách làm khi thật sự cần):
+và cách làm khi thật sự cần). Lần chạy thứ hai (sau khi sửa để `all` không
+còn gọi `normalize` hai lần, xem log bên dưới) là idempotent hoàn toàn — mọi
+bảng giữ nguyên số dòng:
 
 | Bảng | Số dòng | Ghi chú |
 |---|---|---|
-| `places` | 906 | 903 trước lần chạy xác nhận, +3 do Overpass trả về thêm vài phần tử qua mirror khác (xem log bên dưới) |
+| `places` | 906 | không đổi ở lần chạy `all` gần nhất (`load: thêm 0, cập nhật 903`) — 903 → 906 từng xảy ra ở một lần chạy trước đó do Overpass trả về khác đi vài phần tử qua mirror khác nhau giữa các lần truy vấn, không phải lỗi pipeline |
 | `place_chunks` (RAG) | 1.574 | không đổi — wikipedia không ghi thêm chunk mới (đã đủ, idempotent) |
 | `place_images` | 104 | không đổi — commons không ghi thêm ảnh mới (đã đủ, idempotent) |
 | `weather_cache` | 6.144 | không đổi về số dòng ròng — mỗi ô lưới upsert lại 96 giờ dự báo, ghi đè cùng khoá chính |
@@ -124,22 +129,20 @@ Phân bố `places` theo `category`: `nha_hang` 305, `quan_ca_phe` 218,
 `khach_san` 134, `di_tich` 86, `diem_tham_quan` 50, `khac` 41, `bao_tang` 17,
 `lang_tam` 17, `cong_vien` 16, `chua` 13, `song` 9.
 
-Log rút gọn của lần chạy `all` xác nhận (2026-09-23, trên CSDL đã có sẵn dữ
-liệu, không phải DB trống):
+Log đầy đủ của lần chạy `all` gần nhất (2026-09-23, sau khi `normalize`
+được bỏ khỏi `PIPELINE_ORDER` — chỉ còn in đúng một lượt "normalize: ..." vì
+dòng đó là output của bước `load`, trên CSDL đã có sẵn dữ liệu, không phải
+DB trống):
 
 ```
 Đã chạy 0 migration: không có
 boundary: 1 bản ghi
 wikidata: 314 bản ghi
 osm: đang thử endpoint https://overpass-api.de/api/interpreter (lượt 1/2)
-osm: https://overpass-api.de/api/interpreter trả về 504, đợi 60s rồi thử endpoint kế tiếp
-osm: đang thử endpoint https://overpass.kumi.systems/api/interpreter (lượt 1/2)
-osm: https://overpass.kumi.systems/api/interpreter trả về 504, đợi 60s rồi thử endpoint kế tiếp
-osm: đang thử endpoint https://overpass.private.coffee/api/interpreter (lượt 1/2)
-osm: 675 bản ghi
+osm: 687 bản ghi
 normalize: bỏ qua 75 đơn vị hành chính
-normalize: 892 địa điểm, 20 cặp chờ xem tay
-load: thêm 3, cập nhật 889
+normalize: 903 địa điểm, 20 cặp chờ xem tay
+load: thêm 0, cập nhật 903
 wikipedia: 0 bản ghi
 commons: 0 bản ghi
 weather: 6336 bản ghi
@@ -152,11 +155,12 @@ weather: 6336 bản ghi
 | Địa danh có từ 5 ảnh trở lên | 6 | — | (thông tin) |
 ```
 
-Log này minh hoạ đúng thực tế rate-limit mô tả ở mục dưới: Overpass trả 504
-ở hai mirror đầu, module tự động đợi và thử mirror kế tiếp cho tới khi thành
-công. "Địa danh gán nhãn tay" FAIL ở 0/100 là kỳ vọng — chỉ số này chỉ pass
-khi có người điền tay `config/overrides.csv` cho đủ 100 địa danh, việc đó
-chưa nằm trong phạm vi 17 task của kế hoạch dữ liệu.
+Lần chạy trước đó (còn `normalize` trong `PIPELINE_ORDER`) từng phải retry
+Overpass qua 2 mirror trả `504` trước khi thành công ở mirror thứ ba — minh
+hoạ đúng thực tế rate-limit mô tả ở mục dưới; lần chạy này mirror đầu tiên
+đã thành công ngay. "Địa danh gán nhãn tay" FAIL ở 0/100 là kỳ vọng — chỉ
+số này chỉ pass khi có người điền tay `config/overrides.csv` cho đủ 100
+địa danh, việc đó chưa nằm trong phạm vi 17 task của kế hoạch dữ liệu.
 
 ## Chạy lại từ đầu (cold start) và giới hạn tốc độ API
 
@@ -206,8 +210,8 @@ tuỳ place có liên kết nào). Sau khi sửa file, chạy lại:
 python -m pipeline.cli load
 ```
 
-`load` chạy lại toàn bộ `normalize` rồi upsert — override sẽ được áp lại
-cho các place tương ứng mà không cần ingest lại từ nguồn ngoài.
+`load` tự chạy lại `normalize` rồi upsert — override sẽ được áp lại cho các
+place tương ứng mà không cần ingest lại từ nguồn ngoài.
 
 ## File sinh ra và vị trí
 

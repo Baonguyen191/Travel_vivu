@@ -12,16 +12,19 @@ INGEST_MODULES = {
     "weather": "pipeline.ingest.weather",
 }
 
-# Thứ tự chạy của lệnh `all`. boundary/wikidata/osm phải chạy trước
-# normalize và load (chúng cấp nguyên liệu cho normalize). wikipedia và
-# commons cần places đã có id nên chạy sau load. weather độc lập với các
-# place, nên chạy sau cùng.
+# Thứ tự chạy của lệnh `all`. boundary/wikidata/osm phải chạy trước load
+# (chúng cấp nguyên liệu cho bước normalize mà load chạy bên trong nó).
+# wikipedia và commons cần places đã có id nên chạy sau load. weather độc
+# lập với các place, nên chạy sau cùng. `normalize` không nằm trong danh
+# sách này: `load` đã tự chạy đúng một lượt normalize rồi upsert, đưa cả
+# hai vào `all` sẽ chạy normalize hai lần cho cùng một dữ liệu. `normalize`
+# vẫn còn là lệnh đứng riêng cho ai muốn xem báo cáo gộp/nhãn mà không ghi
+# vào DB.
 PIPELINE_ORDER = [
     "migrate",
     "boundary",
     "wikidata",
     "osm",
-    "normalize",
     "load",
     "wikipedia",
     "commons",
@@ -77,6 +80,11 @@ def main() -> int:
     ingest.add_argument("--source", required=True)
     ingest.add_argument("--force", action="store_true")
     args = parser.parse_args()
+
+    if args.command == "ingest" and args.source not in INGEST_MODULES:
+        valid = ", ".join(sorted(INGEST_MODULES))
+        print(f"Nguồn không hợp lệ: '{args.source}'. Các nguồn hợp lệ: {valid}")
+        return 1
 
     conn = db.connect()
     if args.command == "all":
