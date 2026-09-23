@@ -87,16 +87,26 @@ def _insert_place(db_conn, name: str, qid: str) -> int:
     return place_id
 
 
-def test_run_prefers_p18_image_when_present(httpx_mock, monkeypatch, db_conn):
+def test_run_merges_p18_and_category_when_both_present(httpx_mock, monkeypatch, db_conn):
+    # Trước fix này, có image_url (P18) khiến commons_category không bao giờ
+    # được thử — chỉ đúng một ảnh đại diện mỗi địa điểm thay vì cả ảnh đại
+    # diện lẫn danh mục Commons. Cả hai route giờ phải chạy và gộp kết quả.
     raw_root = _setup(monkeypatch, [
         {"external_ids": {"wikidata": "Q1"},
          "tags": {"image_url": "http://commons.wikimedia.org/wiki/Special:FilePath/A%20B.jpg",
-                   "commons_category": "Nên bị bỏ qua"}},
+                   "commons_category": "Not Ignored"}},
     ])
-    place_id = _insert_place(db_conn, "Chỗ P18", "Q1")
+    place_id = _insert_place(db_conn, "Chỗ P18+Category", "Q1")
 
     httpx_mock.add_response(
         url=_p18_url("A B.jpg"), content=_image_body("https://upload.wikimedia.org/a.jpg")
+    )
+    category_url = _api_url({"action": "query", "generator": "categorymembers",
+                              "gcmtitle": "Category:Not Ignored", "gcmnamespace": "6",
+                              "gcmlimit": "30", "prop": "imageinfo",
+                              "iiprop": "url|extmetadata", "format": "json"})
+    httpx_mock.add_response(
+        url=category_url, content=_image_body("https://upload.wikimedia.org/b.jpg")
     )
 
     try:
@@ -104,11 +114,14 @@ def test_run_prefers_p18_image_when_present(httpx_mock, monkeypatch, db_conn):
     finally:
         shutil.rmtree(raw_root, ignore_errors=True)
 
-    assert written == 1
+    assert written == 2
     with db_conn.cursor() as cur:
-        cur.execute("SELECT place_id, image_url, route FROM place_images")
+        cur.execute("SELECT place_id, image_url, route FROM place_images ORDER BY route")
         rows = cur.fetchall()
-    assert rows == [(place_id, "https://upload.wikimedia.org/a.jpg", "p18")]
+    assert rows == [
+        (place_id, "https://upload.wikimedia.org/b.jpg", "category"),
+        (place_id, "https://upload.wikimedia.org/a.jpg", "p18"),
+    ]
 
 
 def test_run_lists_commons_category_when_no_p18(httpx_mock, monkeypatch, db_conn):

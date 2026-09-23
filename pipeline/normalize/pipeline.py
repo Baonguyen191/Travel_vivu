@@ -1,5 +1,6 @@
 import csv
 import json
+from datetime import date
 from pathlib import Path
 
 from pipeline.ingest.osm import STAGED_PATH as OSM_STAGED_PATH
@@ -21,6 +22,20 @@ def load_staged(path: str) -> list[PlaceRecord]:
     if not file.exists():
         return []
     return [PlaceRecord(**row) for row in json.loads(file.read_text(encoding="utf-8"))]
+
+
+def _dated_review_path(base: str) -> Path:
+    """Chèn ngày hôm nay vào tên file trước phần mở rộng.
+
+    Trước fix này, `run()` ghi đè `MERGE_REVIEW_PATH` mỗi lần chạy — nếu ai
+    đó đang điền cột 'dung_khong'/'ghi_chu' tay vào file đó (đúng quy trình
+    "cặp chờ xem tay" của mục QA), một lần `load` chạy song song sẽ xoá sạch
+    tiến độ dở dang của họ. Ghi theo ngày, cùng quy ước `coverage_<ngày>.md`
+    / `sample_<ngày>.csv` đã dùng, để các lần chạy trong ngày khác nhau
+    không đè lên nhau và lịch sử review vẫn còn lại.
+    """
+    path = Path(base)
+    return path.with_name(f"{path.stem}_{date.today().isoformat()}{path.suffix}")
 
 
 def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict], int]:
@@ -47,9 +62,10 @@ def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict], int]:
         print(f"normalize: bỏ qua {dropped} đơn vị hành chính")
     warn_unmatched_overrides(overrides, matched_override_keys)
 
-    Path(MERGE_REVIEW_PATH).parent.mkdir(parents=True, exist_ok=True)
+    review_path = _dated_review_path(MERGE_REVIEW_PATH)
+    review_path.parent.mkdir(parents=True, exist_ok=True)
     fields = ["wikidata_id", "osm_id", "wikidata_name", "osm_name", "distance_m", "reason"]
-    with open(MERGE_REVIEW_PATH, "w", encoding="utf-8", newline="") as fh:
+    with open(review_path, "w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
         writer.writerows(review)

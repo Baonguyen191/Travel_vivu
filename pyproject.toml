@@ -17,8 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-httpx>=0.35"]
 
-[tool.setuptools]
-packages = ["pipeline"]
+[tool.setuptools.packages.find]
+include = ["pipeline*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

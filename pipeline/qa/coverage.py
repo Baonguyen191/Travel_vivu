@@ -167,7 +167,7 @@ def render_report(metrics: list[Metric], merge_review_rows: int) -> str:
             result = "PASS" if m.passed else "FAIL"
         lines.append(f"| {m.name} | {value} | {threshold} | {result} |")
 
-    lines += ["", f"Cặp chờ xem tay trong merge_review.csv: {merge_review_rows}", ""]
+    lines += ["", f"Cặp chờ xem tay trong merge_review_<ngày>.csv: {merge_review_rows}", ""]
 
     keys = {m.key for m in metrics if m.key is not None}
     if "opening_hours" in keys:
@@ -204,10 +204,13 @@ def _write_sample(conn) -> None:
 
 def run(conn, cfg) -> list[Metric]:
     QA_DIR.mkdir(parents=True, exist_ok=True)
-    merge_path = QA_DIR / "merge_review.csv"
+    # normalize ghi merge_review theo ngày (merge_review_<ngày>.csv) để không
+    # đè lên tiến độ review dở dang của người khác — đọc file mới nhất theo
+    # tên (ISO date sắp xếp đúng theo thứ tự chuỗi).
+    merge_files = sorted(QA_DIR.glob("merge_review_*.csv"))
     merge_rows = 0
-    if merge_path.exists():
-        with open(merge_path, encoding="utf-8", newline="") as fh:
+    if merge_files:
+        with open(merge_files[-1], encoding="utf-8", newline="") as fh:
             merge_rows = max(0, sum(1 for _ in fh) - 1)
 
     metrics = collect_metrics(conn, cfg)

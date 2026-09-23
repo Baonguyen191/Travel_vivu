@@ -341,7 +341,7 @@ git commit -m "feat: dựng PostGIS + pgvector và migration runner"
 **Interfaces:**
 - Consumes: không
 - Produces:
-  - `CityConfig(name: str, bbox: tuple[float, float, float, float], core_center: tuple[float, float], core_radius_km: float, polygon_wkt: str | None)`, bbox theo thứ tự `(south, west, north, east)`
+  - `CityConfig(name: str, bbox: tuple[float, float, float, float], core_center: tuple[float, float], core_radius_km: float, polygon_path: str | None)`, bbox theo thứ tự `(south, west, north, east)`
   - `load_city(path: str = "config/city_hue.yml") -> CityConfig`
   - `save_city(cfg: CityConfig, path: str) -> None`
   - `PlaceRecord(name, external_ids: dict[str, str], lat, lon, category="khac", name_en=None, opening_hours=None, opening_hours_raw=None, website=None, source_url=None, tags: dict[str, str] = {}, wikidata_classes: list[str] = [], avg_visit_minutes=None, indoor_ratio=None, weather_sensitivity=None, best_time_of_day=None, unsafe_conditions=None, ticket_price=None, dress_code=None, label_source="default")`
@@ -364,14 +364,14 @@ def test_load_city_reads_bbox_and_core(tmp_path):
         "bbox: [16.335, 107.435, 16.605, 107.725]\n"
         "core_center: [16.4698, 107.5796]\n"
         "core_radius_km: 15\n"
-        "polygon_wkt: null\n",
+        "polygon_path: null\n",
         encoding="utf-8",
     )
     cfg = load_city(str(p))
     assert cfg.name == "Huế"
     assert cfg.bbox == (16.335, 107.435, 16.605, 107.725)
     assert cfg.core_center == (16.4698, 107.5796)
-    assert cfg.polygon_wkt is None
+    assert cfg.polygon_path is None
 
 
 def test_save_city_roundtrips_polygon(tmp_path):
@@ -381,7 +381,7 @@ def test_save_city_roundtrips_polygon(tmp_path):
         bbox=(16.0, 107.0, 17.0, 108.0),
         core_center=(16.5, 107.5),
         core_radius_km=15.0,
-        polygon_wkt="POLYGON((107 16, 108 16, 108 17, 107 16))",
+        polygon_path="POLYGON((107 16, 108 16, 108 17, 107 16))",
     )
     save_city(cfg, str(p))
     assert load_city(str(p)) == cfg
@@ -456,7 +456,7 @@ class CityConfig:
     bbox: tuple[float, float, float, float]
     core_center: tuple[float, float]
     core_radius_km: float
-    polygon_wkt: str | None = None
+    polygon_path: str | None = None
 
 
 def load_city(path: str = "config/city_hue.yml") -> CityConfig:
@@ -467,7 +467,7 @@ def load_city(path: str = "config/city_hue.yml") -> CityConfig:
         bbox=tuple(raw["bbox"]),
         core_center=tuple(raw["core_center"]),
         core_radius_km=float(raw["core_radius_km"]),
-        polygon_wkt=raw.get("polygon_wkt"),
+        polygon_path=raw.get("polygon_path"),
     )
 
 
@@ -489,7 +489,7 @@ bbox: [16.335, 107.435, 16.605, 107.725]
 # Kinh thành Huế
 core_center: [16.4698, 107.5796]
 core_radius_km: 15
-polygon_wkt: null
+polygon_path: null
 ```
 
 - [ ] **Step 6: Chạy test**
@@ -719,7 +719,7 @@ git commit -m "feat: thêm tầng HTTP có rate limit, lưu raw và dedupe theo 
 
 **Interfaces:**
 - Consumes: `Fetcher`, `CityConfig`, `save_city`
-- Produces: `pipeline.ingest.boundary.run(conn, cfg: CityConfig, force: bool = False) -> int` — ghi `polygon_wkt` vào `config/city_hue.yml`, trả số ring lấy được; `pipeline.ingest.boundary.rings_to_wkt(elements: list[dict]) -> str`
+- Produces: `pipeline.ingest.boundary.run(conn, cfg: CityConfig, force: bool = False) -> int` — ghi `polygon_path` vào `config/city_hue.yml`, trả số ring lấy được; `pipeline.ingest.boundary.rings_to_wkt(elements: list[dict]) -> str`
 
 Huế là thành phố trực thuộc trung ương từ 2025-01-01, nên OSM gắn `admin_level=4`. Query hỏi theo tên và chấp nhận cả `4` lẫn `6`, chọn quan hệ có `admin_level` lớn nhất (đơn vị nhỏ nhất) để tránh lấy nhầm ranh giới cấp trên.
 
@@ -852,7 +852,7 @@ if args.command == "ingest":
 - [ ] **Step 6: Chạy thật một lần**
 
 Run: `python -m pipeline.cli ingest --source boundary`
-Expected: in `boundary: 1 bản ghi`, và `config/city_hue.yml` có `polygon_wkt` dài vài nghìn ký tự. Nếu Overpass trả `429` hoặc `504`, chờ 60 giây rồi chạy lại — đây là hạn mức công cộng.
+Expected: in `boundary: 1 bản ghi`, và `config/city_hue.yml` có `polygon_path` dài vài nghìn ký tự. Nếu Overpass trả `429` hoặc `504`, chờ 60 giây rồi chạy lại — đây là hạn mức công cộng.
 
 - [ ] **Step 7: Commit**
 

@@ -42,6 +42,20 @@ def grid_points(cfg: CityConfig, step: float = 0.1) -> list[tuple[float, float]]
     return points
 
 
+def _at(array: list | None, i: int):
+    """Trả về phần tử thứ i của mảng, hoặc None nếu mảng vắng mặt/ngắn hơn.
+
+    Open-Meteo có thể bỏ hẳn một biến `hourly` khỏi payload (không phải chỉ
+    một giá trị null trong mảng) khi biến đó tạm thời không khả dụng cho một
+    ô lưới. Trước fix này, `h["temperature_2m"][i]` ném KeyError ra ngoài
+    try/except theo-ô-lưới của `run()`, làm chết toàn bộ lượt chạy thay vì
+    chỉ ghi NULL cho ô đó — cùng dạng lỗi đã sửa cho `parse_normals`.
+    """
+    if array is None or i >= len(array):
+        return None
+    return array[i]
+
+
 def parse_forecast(payload: dict) -> list[dict]:
     h = payload["hourly"]
     suffix = _utc_offset_suffix(payload.get("utc_offset_seconds", 0))
@@ -49,12 +63,12 @@ def parse_forecast(payload: dict) -> list[dict]:
     for i, stamp in enumerate(h["time"]):
         rows.append({
             "forecast_time": f"{stamp}{suffix}",
-            "temperature": h["temperature_2m"][i],
-            "precip_prob": h["precipitation_probability"][i],
-            "precip_mm": h["precipitation"][i],
-            "wind_speed": h["wind_speed_10m"][i],
-            "uv_index": h["uv_index"][i],
-            "weather_code": h["weather_code"][i],
+            "temperature": _at(h.get("temperature_2m"), i),
+            "precip_prob": _at(h.get("precipitation_probability"), i),
+            "precip_mm": _at(h.get("precipitation"), i),
+            "wind_speed": _at(h.get("wind_speed_10m"), i),
+            "uv_index": _at(h.get("uv_index"), i),
+            "weather_code": _at(h.get("weather_code"), i),
         })
     return rows
 

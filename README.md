@@ -55,6 +55,11 @@ Có thể sao `.env.example` thành `.env` để ghi nhớ giá trị (`DATABASE
 shell trước khi chạy — file `.env` chỉ là ghi chú, không có cơ chế đọc tự
 động.
 
+Mọi lệnh CLI dưới đây phải chạy từ **thư mục gốc của repo** — config
+(`config/*.yml`, `config/overrides.csv`) và dữ liệu (`data/...`) đều được
+đọc/ghi theo đường dẫn tương đối với thư mục làm việc hiện tại, không phải
+tương đối với vị trí file Python.
+
 ## Dựng database và chạy pipeline
 
 ```bash
@@ -234,7 +239,8 @@ commit):
 - `data/staged/` — kết quả trung gian trước khi chuẩn hoá.
 - `data/qa/` — báo cáo chất lượng dữ liệu (`coverage_<ngày>.md`), file mẫu
   kiểm duyệt (`sample_<ngày>.csv`), danh sách cặp nghi trùng
-  (`merge_review.csv`).
+  (`merge_review_<ngày>.csv` — ghi theo ngày để không đè lên một review tay
+  đang làm dở của lần chạy trước).
 - `data/generated/` — file sinh ra dùng lại cho lần chạy sau (ví dụ
   `city_hue_boundary.wkt`).
 

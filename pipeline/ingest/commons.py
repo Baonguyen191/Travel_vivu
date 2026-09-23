@@ -76,58 +76,57 @@ def _places_with_tags(conn) -> list[tuple[int, str, dict]]:
     return [(place_id, name, tags_by_qid.get(qid, {})) for place_id, name, qid in rows]
 
 
-def _fetch_for_place(fetcher: Fetcher, tags: dict, force: bool):
-    """Chọn tuyến khớp ảnh trong dữ liệu Wikidata đã tuyển chọn cho địa điểm.
+def _route_requests(tags: dict) -> list[tuple[str, dict]]:
+    """Liệt kê các tuyến khớp ảnh áp dụng cho địa điểm, theo tags Wikidata.
 
-    Trả về (route, FetchResult); route là None và không gọi API nào khi
-    không có `image_url` lẫn `commons_category`. Chỉ hai route: ảnh đại
-    diện P18, hoặc danh mục Commons (P373) — cả hai đều do Wikidata tuyển
-    chọn, đáng tin cậy cho tập ảnh tham chiếu nhận diện landmark.
+    Trước fix này, có image_url (P18) khiến hàm return sớm và commons_category
+    (P373) không bao giờ được thử — 55 địa điểm có cả hai chỉ từng nhận đúng
+    một ảnh đại diện thay vì cả ảnh đại diện lẫn danh mục Commons đầy đủ. Giờ
+    cả hai tuyến sẵn có đều được thử, kết quả gộp lại ở run() và cắt còn tối
+    đa MAX_IMAGES ảnh mỗi địa điểm.
     """
+    routes = []
     image_url = tags.get("image_url")
     commons_category = tags.get("commons_category")
     if image_url:
-        res = fetcher.fetch(
-            API_URL,
-            params={"action": "query", "titles": _file_title_from_url(image_url),
-                    "prop": "imageinfo", "iiprop": "url|extmetadata", "format": "json"},
-            force=force,
-        )
-        return "p18", res
+        routes.append(("p18", {
+            "action": "query", "titles": _file_title_from_url(image_url),
+            "prop": "imageinfo", "iiprop": "url|extmetadata", "format": "json",
+        }))
     if commons_category:
-        res = fetcher.fetch(
-            API_URL,
-            params={"action": "query", "generator": "categorymembers",
-                    "gcmtitle": f"Category:{commons_category}", "gcmnamespace": "6",
-                    "gcmlimit": str(MAX_IMAGES), "prop": "imageinfo",
-                    "iiprop": "url|extmetadata", "format": "json"},
-            force=force,
-        )
-        return "category", res
-    return None, None
+        routes.append(("category", {
+            "action": "query", "generator": "categorymembers",
+            "gcmtitle": f"Category:{commons_category}", "gcmnamespace": "6",
+            "gcmlimit": str(MAX_IMAGES), "prop": "imageinfo",
+            "iiprop": "url|extmetadata", "format": "json",
+        }))
+    return routes
 
 
 def run(conn, cfg, force: bool = False) -> int:
     fetcher = Fetcher(conn, "commons", min_interval=1.0)
     written = 0
     for place_id, name, tags in _places_with_tags(conn):
-        try:
-            route, res = _fetch_for_place(fetcher, tags, force)
-        except httpx.HTTPStatusError as exc:
-            print(
-                f"commons: bỏ qua '{name}' (địa điểm #{place_id}) —"
-                f" lỗi HTTP {exc.response.status_code}"
-            )
-            continue
-        except httpx.TimeoutException:
-            print(f"commons: bỏ qua '{name}' (địa điểm #{place_id}) — timeout")
-            continue
+        combined: list[tuple[str, "ImageRecord"]] = []
+        for route, params in _route_requests(tags):
+            try:
+                res = fetcher.fetch(API_URL, params=params, force=force)
+            except httpx.HTTPStatusError as exc:
+                print(
+                    f"commons: bỏ qua route '{route}' của '{name}' (địa điểm"
+                    f" #{place_id}) — lỗi HTTP {exc.response.status_code}"
+                )
+                continue
+            except httpx.TimeoutException:
+                print(
+                    f"commons: bỏ qua route '{route}' của '{name}'"
+                    f" (địa điểm #{place_id}) — timeout"
+                )
+                continue
+            for image in parse_imageinfo(json.loads(res.content)):
+                combined.append((route, image))
 
-        if route is None:
-            continue
-
-        images = parse_imageinfo(json.loads(res.content))[:MAX_IMAGES]
-        for image in images:
+        for route, image in combined[:MAX_IMAGES]:
             with conn.cursor() as cur:
                 cur.execute(
                     "INSERT INTO place_images (place_id, image_url, license, author, route)"

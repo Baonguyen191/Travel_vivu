@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from pipeline.config import CityConfig
 from pipeline.normalize import pipeline as normalize_pipeline
@@ -36,7 +37,7 @@ def test_load_staged_reads_records_back_into_place_records(tmp_path):
 def test_run_drops_administrative_units_and_counts_them(tmp_path, monkeypatch):
     wikidata_path = tmp_path / "wikidata.json"
     osm_path = tmp_path / "osm.json"
-    review_path = tmp_path / "qa" / "merge_review.csv"
+    review_base = tmp_path / "qa" / "merge_review.csv"
 
     _write_staged(wikidata_path, [
         # Q687188 map tới don_vi_hanh_chinh (config/categories.yml) — phải bị bỏ.
@@ -50,7 +51,7 @@ def test_run_drops_administrative_units_and_counts_them(tmp_path, monkeypatch):
 
     monkeypatch.setattr(normalize_pipeline, "WIKIDATA_STAGED_PATH", str(wikidata_path))
     monkeypatch.setattr(normalize_pipeline, "OSM_STAGED_PATH", str(osm_path))
-    monkeypatch.setattr(normalize_pipeline, "MERGE_REVIEW_PATH", str(review_path))
+    monkeypatch.setattr(normalize_pipeline, "MERGE_REVIEW_PATH", str(review_base))
 
     places, review, dropped = normalize_pipeline.run(None, CFG)
 
@@ -62,19 +63,30 @@ def test_run_drops_administrative_units_and_counts_them(tmp_path, monkeypatch):
 def test_run_writes_review_csv_header_even_when_qa_dir_is_missing(tmp_path, monkeypatch):
     wikidata_path = tmp_path / "wikidata.json"
     osm_path = tmp_path / "osm.json"
-    review_path = tmp_path / "qa_out" / "merge_review.csv"
+    review_base = tmp_path / "qa_out" / "merge_review.csv"
 
     _write_staged(wikidata_path, [])
     _write_staged(osm_path, [])
 
-    assert not review_path.parent.exists()
+    assert not review_base.parent.exists()
 
     monkeypatch.setattr(normalize_pipeline, "WIKIDATA_STAGED_PATH", str(wikidata_path))
     monkeypatch.setattr(normalize_pipeline, "OSM_STAGED_PATH", str(osm_path))
-    monkeypatch.setattr(normalize_pipeline, "MERGE_REVIEW_PATH", str(review_path))
+    monkeypatch.setattr(normalize_pipeline, "MERGE_REVIEW_PATH", str(review_base))
 
     normalize_pipeline.run(None, CFG)
 
-    assert review_path.exists()
-    header = review_path.read_text(encoding="utf-8").splitlines()[0]
+    # Ghi theo ngày (finding "merge_review.csv is overwritten on every run")
+    # — không còn đúng tên tĩnh "merge_review.csv" nữa.
+    dated = review_base.with_name(
+        f"merge_review_{date.today().isoformat()}.csv"
+    )
+    assert dated.exists()
+    header = dated.read_text(encoding="utf-8").splitlines()[0]
     assert header == "wikidata_id,osm_id,wikidata_name,osm_name,distance_m,reason"
+
+
+def test_dated_review_path_inserts_date_before_extension():
+    path = normalize_pipeline._dated_review_path("data/qa/merge_review.csv")
+    assert path.name == f"merge_review_{date.today().isoformat()}.csv"
+    assert path.parent.name == "qa"
