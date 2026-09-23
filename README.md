@@ -251,6 +251,21 @@ lần chạy test đầu tiên (fixture `_test_database` trong `tests/conftest.p
 Một số test cần Docker đang chạy (đánh dấu `integration` trong
 `pyproject.toml`).
 
+## Ghi chú lược đồ dữ liệu
+
+- **`opening_hours` (JSONB trên `places`)**: mỗi ngày trong tuần ánh xạ tới
+  một danh sách khoảng `["HH:MM", "HH:MM"]`. `"24:00"` nghĩa là **hết ngày /
+  nửa đêm** — cùng quy ước OSM/Overpass đã dùng cho `24/7` — không phải
+  `"00:00"` của ngày hôm sau. Một khoảng qua nửa đêm trong chuỗi OSM gốc (vd.
+  `Mo-Su 17:00-01:30`) được `pipeline.normalize.opening_hours` TÁCH thành hai
+  đoạn khi parse: `["17:00", "24:00"]` ghi vào ngày đó, `["00:00", "01:30"]`
+  ghi vào ngày kế tiếp — nhờ vậy `end - start` trên một đoạn không bao giờ âm.
+- **`climate_normals.rain_days`**: **tỷ lệ** (0.0–1.0) số ngày trong tháng có
+  lượng mưa ≥ 1mm, tính trên 30 năm dữ liệu (1991–2020) — không phải số ngày
+  tuyệt đối.
+- **`climate_normals.precip_mm_avg`**: lượng mưa **trung bình một ngày**
+  trong tháng (mm/ngày), không phải tổng lượng mưa cả tháng.
+
 ## Bản quyền / ghi nguồn dữ liệu
 
 - Nội dung tóm tắt từ Wikipedia (`place_chunks`) theo giấy phép **CC

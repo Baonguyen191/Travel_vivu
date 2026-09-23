@@ -92,3 +92,37 @@ def test_multi_clause_all_with_day_parts_still_parses():
     assert result["fri"] == [["08:00", "17:00"]]
     assert result["sat"] == [["08:00", "12:00"]]
     assert result["sun"] == []
+
+
+def test_wraparound_time_range_splits_across_midnight():
+    # 17:00-01:30 mỗi ngày trong tuần: đoạn đầu [17:00, 24:00] ghi vào chính
+    # ngày đó, đoạn còn lại [00:00, 01:30] tràn sang ngày hôm sau — mỗi
+    # ngày trong Mo-Su đều là "hôm sau" của một ngày khác cũng trong Mo-Su,
+    # nên mọi ngày đều có cả hai đoạn.
+    result = parse_opening_hours("Mo-Su 17:00-01:30")
+    for day in DAYS:
+        assert ["00:00", "01:30"] in result[day]
+        assert ["17:00", "24:00"] in result[day]
+
+
+def test_bare_wraparound_time_range_splits_across_midnight():
+    result = parse_opening_hours("16:00-04:00")
+    for day in DAYS:
+        assert ["00:00", "04:00"] in result[day]
+        assert ["16:00", "24:00"] in result[day]
+
+
+def test_end_at_midnight_is_treated_as_24_00_not_a_wraparound():
+    # "...-00:00" là cách viết tắt phổ biến cho đóng cửa lúc nửa đêm — không
+    # được tách thành một đoạn tràn ["00:00","00:00"] rỗng ở ngày kế tiếp.
+    result = parse_opening_hours("Mo-Su 18:00-00:00")
+    for day in DAYS:
+        assert result[day] == [["18:00", "24:00"]]
+
+
+def test_zero_length_interval_returns_none():
+    assert parse_opening_hours("Mo-Su 12:00-12:00") is None
+
+
+def test_bare_zero_length_interval_returns_none():
+    assert parse_opening_hours("10:00-10:00") is None
