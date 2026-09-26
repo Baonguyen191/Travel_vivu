@@ -50,6 +50,14 @@ don_vi_hanh_chinh:
   { indoor_ratio: 0.5, avg_visit_minutes: null,
     weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
     best_time_of_day: [bat_ky], unsafe_conditions: [] }
+boi_canh:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+ha_tang:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
 khac:
   { indoor_ratio: 0.5, avg_visit_minutes: null,
     weather_sensitivity: { rain: 0.5, heat: 0.5, wind: 0.2 },

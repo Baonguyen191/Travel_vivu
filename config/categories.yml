@@ -35,8 +35,31 @@ wikidata:
   Q5393308: chua                # Buddhist temple / chùa
   Q10948212: chua               # Confucian royal ancestral shrine / miếu thờ tổ tiên hoàng gia
   Q618618: chua                 # temple of Confucius / văn miếu
-  # Q55488 (railway station), Q164950 (dynasty), Q27554677 (former capital),
-  # Q515 (city) cố ý không map: không phải điểm đến du lịch cụ thể, để "khac".
+  # --- Không phải điểm đến: tách khỏi "khac" để RAG và bộ lập lịch loại ra ---
+  # Trước đây để "khac", nhưng "khac" lẫn cả điểm tham quan thật (Kinh thành,
+  # Đàn Nam Giao, Lăng Kiến Phúc) nên không lọc theo category được. Các bài
+  # Wikipedia của nhóm này (thành phố Huế, triều đại, trận đánh...) chiếm gần
+  # nửa kho chunk và chen vào top-k của RAG (data/qa/rag_benchmark_2026-09-26.md).
+  # boi_canh: thực thể lịch sử/hành chính, không đến thăm được.
+  Q27554677: boi_canh    # former capital / cố đô (bản ghi "Huế")
+  Q3455658: boi_canh     # regions of Vietnam / vùng
+  Q164950: boi_canh      # dynasty / triều đại
+  Q12552047: boi_canh    # lord / lãnh chúa (Chúa Nguyễn)
+  Q3024240: boi_canh     # historical country / cựu quốc gia
+  Q48349: boi_canh       # empire / đế quốc
+  Q178561: boi_canh      # battle / trận đánh
+  Q645883: boi_canh      # military operation / hoạt động quân sự
+  Q273120: boi_canh      # protest / biểu tình
+  # ha_tang: công trình phục vụ dân sinh, không phải điểm tham quan.
+  Q55488: ha_tang        # railway station / ga
+  Q695850: ha_tang       # airbase / sân bay quân sự
+  Q16917: ha_tang        # hospital / bệnh viện
+  Q3918: ha_tang         # university / đại học
+  Q4671277: ha_tang      # academic institution / học viện
+  Q483110: ha_tang       # stadium / sân vận động
+  Q12323: ha_tang        # dam / đập
+  # Q515 (city) cố ý KHÔNG map: "Cố đô Huế" (quần thể di tích UNESCO) cũng mang
+  # class này, map thì mất một điểm đến chính.
 osm:
   - { match: { amenity: restaurant }, category: nha_hang }
   - { match: { amenity: fast_food }, category: nha_hang }
