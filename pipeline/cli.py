@@ -14,7 +14,8 @@ INGEST_MODULES = {
 
 # Thứ tự chạy của lệnh `all`. boundary/wikidata/osm phải chạy trước load
 # (chúng cấp nguyên liệu cho bước normalize mà load chạy bên trong nó).
-# wikipedia và commons cần places đã có id nên chạy sau load. weather độc
+# wikipedia và commons cần places đã có id nên chạy sau load. embed sinh
+# vector cho các chunk mà wikipedia vừa ghi nên chạy ngay sau nó. weather độc
 # lập với các place, nên chạy sau cùng. `normalize` không nằm trong danh
 # sách này: `load` đã tự chạy đúng một lượt normalize rồi upsert, đưa cả
 # hai vào `all` sẽ chạy normalize hai lần cho cùng một dữ liệu. `normalize`
@@ -27,6 +28,7 @@ PIPELINE_ORDER = [
     "osm",
     "load",
     "wikipedia",
+    "embed",
     "commons",
     "weather",
     "qa",
@@ -34,6 +36,14 @@ PIPELINE_ORDER = [
 
 
 def _run_step(step: str, conn, force: bool = False) -> int:
+    if step == "download-model":
+        from pipeline.embed import check_dimension, get_embedder
+
+        embedder = get_embedder()
+        check_dimension(embedder)
+        print(f"Model '{embedder.model_name}' sẵn sàng ({embedder.dimension} chiều)")
+        return 0
+
     if step == "migrate":
         applied = db.run_migrations(conn)
         print(f"Đã chạy {len(applied)} migration: {', '.join(applied) or 'không có'}")
@@ -66,6 +76,13 @@ def _run_step(step: str, conn, force: bool = False) -> int:
             print(f"load: thêm {inserted}, cập nhật {updated}")
         return 0
 
+    if step == "embed":
+        from pipeline.embed import run_embed_chunks
+
+        count = run_embed_chunks(conn, force=force)
+        print(f"embed: {count} chunk")
+        return 0
+
     if step not in INGEST_MODULES:
         valid = ", ".join(sorted(INGEST_MODULES))
         print(f"Nguồn không hợp lệ: '{step}'. Các nguồn hợp lệ: {valid}")
@@ -80,8 +97,10 @@ def _run_step(step: str, conn, force: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="pipeline")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("migrate", "normalize", "load", "qa", "label-agreement", "all"):
+    for name in ("migrate", "normalize", "load", "qa", "label-agreement", "all", "download-model"):
         sub.add_parser(name)
+    embed_parser = sub.add_parser("embed")
+    embed_parser.add_argument("--force", action="store_true")
     ingest = sub.add_parser("ingest")
     ingest.add_argument("--source", required=True)
     ingest.add_argument("--force", action="store_true")
@@ -92,6 +111,9 @@ def main() -> int:
         print(f"Nguồn không hợp lệ: '{args.source}'. Các nguồn hợp lệ: {valid}")
         return 1
 
+    if args.command == "download-model":
+        return _run_step(args.command, conn=None)
+
     conn = db.connect()
     if args.command == "all":
         for step in PIPELINE_ORDER:
@@ -101,7 +123,7 @@ def main() -> int:
         return 0
     if args.command == "ingest":
         return _run_step(args.source, conn, force=args.force)
-    return _run_step(args.command, conn)
+    return _run_step(args.command, conn, force=getattr(args, "force", False))
 
 
 if __name__ == "__main__":

@@ -16,9 +16,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-httpx>=0.35"]
+embed = ["sentence-transformers>=3.0"]
 
 [tool.setuptools.packages.find]
-include = ["pipeline*"]
+include = ["pipeline*", "rag*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
