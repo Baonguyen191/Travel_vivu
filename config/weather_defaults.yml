@@ -1,0 +1,64 @@
+di_tich:
+  { indoor_ratio: 0.3, avg_visit_minutes: 90,
+    weather_sensitivity: { rain: 0.8, heat: 0.7, wind: 0.2 },
+    best_time_of_day: [sang_som, chieu_muon], unsafe_conditions: [mua_lon] }
+chua:
+  { indoor_ratio: 0.5, avg_visit_minutes: 45,
+    weather_sensitivity: { rain: 0.6, heat: 0.5, wind: 0.2 },
+    best_time_of_day: [sang_som], unsafe_conditions: [mua_lon] }
+lang_tam:
+  { indoor_ratio: 0.25, avg_visit_minutes: 75,
+    weather_sensitivity: { rain: 0.8, heat: 0.7, wind: 0.2 },
+    best_time_of_day: [sang_som, chieu_muon], unsafe_conditions: [mua_lon] }
+bao_tang:
+  { indoor_ratio: 0.95, avg_visit_minutes: 60,
+    weather_sensitivity: { rain: 0.1, heat: 0.1, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+diem_tham_quan:
+  { indoor_ratio: 0.4, avg_visit_minutes: 60,
+    weather_sensitivity: { rain: 0.6, heat: 0.5, wind: 0.3 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [mua_lon] }
+diem_ngam_canh:
+  { indoor_ratio: 0.05, avg_visit_minutes: 30,
+    weather_sensitivity: { rain: 0.9, heat: 0.6, wind: 0.5 },
+    best_time_of_day: [hoang_hon], unsafe_conditions: [mua_lon, bao] }
+cong_vien:
+  { indoor_ratio: 0.05, avg_visit_minutes: 45,
+    weather_sensitivity: { rain: 0.9, heat: 0.8, wind: 0.3 },
+    best_time_of_day: [sang_som, chieu_muon], unsafe_conditions: [mua_lon, bao] }
+bai_bien:
+  { indoor_ratio: 0.0, avg_visit_minutes: 120,
+    weather_sensitivity: { rain: 0.9, heat: 0.5, wind: 0.8 },
+    best_time_of_day: [sang_som, chieu_muon], unsafe_conditions: [bao, song_lon, mua_lon] }
+song:
+  { indoor_ratio: 0.1, avg_visit_minutes: 60,
+    weather_sensitivity: { rain: 0.7, heat: 0.5, wind: 0.8 },
+    best_time_of_day: [hoang_hon], unsafe_conditions: [bao, mua_lon] }
+nha_hang:
+  { indoor_ratio: 0.8, avg_visit_minutes: 60,
+    weather_sensitivity: { rain: 0.2, heat: 0.2, wind: 0.1 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+quan_ca_phe:
+  { indoor_ratio: 0.7, avg_visit_minutes: 45,
+    weather_sensitivity: { rain: 0.3, heat: 0.2, wind: 0.1 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+khach_san:
+  { indoor_ratio: 0.9, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+don_vi_hanh_chinh:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+boi_canh:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+ha_tang:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.0, heat: 0.0, wind: 0.0 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }
+khac:
+  { indoor_ratio: 0.5, avg_visit_minutes: null,
+    weather_sensitivity: { rain: 0.5, heat: 0.5, wind: 0.2 },
+    best_time_of_day: [bat_ky], unsafe_conditions: [] }

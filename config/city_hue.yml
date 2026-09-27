@@ -1,0 +1,11 @@
+name: Huế
+bbox:
+- 16.335
+- 107.435
+- 16.605
+- 107.725
+core_center:
+- 16.4698
+- 107.5796
+core_radius_km: 15.0
+polygon_path: data/generated/city_hue_boundary.wkt

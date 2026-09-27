@@ -23,9 +23,9 @@ LLM agent điều phối + tools. LLM (có khả năng đọc ảnh) hiểu yêu
 | Lưu file | `data/raw/` trên đĩa; chuyển sang MinIO khi có backend |
 | Tối ưu lịch | Google OR-Tools |
 | Thời tiết | Open-Meteo |
-| Chỉ đường | Goong.io hoặc OSRM tự host; dẫn đường thực tế deep link sang app bản đồ |
+| Chỉ đường | Nhúng Google Maps API (Routes / Distance Matrix API) kết hợp OSRM / Goong làm fallback; dẫn đường thực tế deep link sang app bản đồ |
 
-Hiện **không dùng API có key**: chỉ Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Không Google Places, không Foursquare, không LLM API. Chi phí API là rủi ro thật của đồ án — chọn phương án miễn phí trước.
+Các dịch vụ mặc định dùng API miễn phí: Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Sử dụng **Google Maps API** cho riêng tính năng chỉ đường và ma trận giao thông/tắc đường real-time. Không dùng Google Places / Foursquare / LLM API thương mại khác để tối ưu chi phí.
 
 Python 3.14 trên máy phát triển. Tránh Scrapy (chưa chắc có wheel); dùng `httpx`, `selectolax`, `trafilatura`, `psycopg` v3.
 
@@ -57,6 +57,23 @@ Hai loại ràng buộc:
 
 Cache dự báo theo lưới tọa độ làm tròn ~0.1 độ, không gọi API cho từng địa điểm.
 
+## Tối ưu chỉ đường dựa trên thời tiết và độ tắc đường (Google Maps API)
+
+Nhúng Google Maps API (Routes API / Distance Matrix API) để tính toán tuyến đường và thời gian di chuyển thực tế, kết hợp giữa tình trạng giao thông thời gian thực và yếu tố thời tiết:
+
+1. **Dữ liệu giao thông thời gian thực (Real-time Traffic):**
+   - Trích xuất `duration_in_traffic` và mức độ ùn tắc từ Google Maps API theo đúng khung giờ dự kiến di chuyển trong ngày (bao gồm giờ cao điểm).
+   - Cập nhật ma trận thời gian di chuyển (Travel Time Matrix) làm đầu vào chính xác cho thuật toán tối ưu lịch trình (OR-Tools VRP) thay vì dùng khoảng cách địa lý đơn thuần.
+
+2. **Tối ưu chỉ đường thích ứng Thời tiết (Weather-aware Routing):**
+   - **Hệ số phạt thời gian di chuyển (Travel Time Penalty Factor):** Khi Open-Meteo dự báo mưa lớn, ngập lụt, sương mù hoặc tầm nhìn kém, thời gian di chuyển thực tế được nhân thêm hệ số điều chỉnh (ví dụ: $1.2\times - 1.5\times$) để phản ánh tốc độ lưu thông giảm.
+   - **Né tránh tuyến đường rủi ro (Safe Routing):** Tự động phát hiện và loại bỏ/giảm ưu tiên các tuyến đường dễ ngập lụt, đường ven sông Hương, hoặc ngõ ngách hẹp khi có cảnh báo mưa lớn/bão.
+   - **Gợi ý phương tiện & lộ trình thay thế:** Đề xuất lộ trình an toàn hơn (ví dụ: chọn đường lớn ít ngập thay vì tuyến ngắn nhất qua ngõ) hoặc điều chỉnh khuyến nghị phương tiện di chuyển (ô tô/taxi thay cho xe máy).
+
+3. **Tích hợp thuật toán & Trải nghiệm người dùng:**
+   - **Hàm mục tiêu tổng hợp:** $\text{Cost}(i, j) = \text{Google\_Traffic\_Duration}(i, j) \times \text{Weather\_Penalty} + \text{Risk\_Penalty}$.
+   - **Deep link & Dẫn đường:** Hiển thị trực quan tuyến đường trên bản đồ giao diện ứng dụng, đồng thời cung cấp deep link mở ứng dụng Google Maps để người dùng sử dụng tính năng dẫn đường turn-by-turn.
+
 ## Dữ liệu
 
 Dataset và API miễn phí làm nền: Wikidata, Wikipedia/Wikivoyage, OpenStreetMap Overpass, Wikimedia Commons, Open-Meteo. Crawl trang di tích và sở du lịch để bổ sung giá vé, quy định trang phục. Foursquare và Google Places chỉ cân nhắc khi có key và khi OSM thiếu quá nhiều.
@@ -87,9 +104,11 @@ Mỗi tính năng phải có chỉ số và baseline, thiết kế trước khi 
 | Thành phần | Chỉ số | Baseline so sánh |
 |---|---|---|
 | Nhận diện địa danh | Top-1 / Top-5 trên tập ảnh test tự chụp | LLM thuần |
+| Truy hồi RAG (hybrid: bge-m3 + BM25 giữ dấu/bỏ dấu/bigram, RRF; loại category không phải điểm đến) | Hit@k, MRR, nDCG@5, Precision@5, AnswerHit@5 trên `eval/rag_queries.yml` (`python -m rag.benchmark`) | Dense, BM25, random |
 | Hỏi đáp | Tỷ lệ thông tin sai / bịa | Không có RAG |
 | Lập lịch | Tỷ lệ lịch khả thi (đúng giờ mở cửa, trong ngân sách, di chuyển kịp) | LLM tự lập lịch |
 | Thời tiết | Sinh lịch trên thời tiết lịch sử, đối chiếu thời tiết thực tế: số giờ ngoài trời khi mưa, số hoạt động bị hủy do bão | Bộ lập lịch không có tính năng thời tiết |
+| Chỉ đường & giao thông | Thời gian di chuyển thực tế, tỷ lệ né tránh thành công điểm tắc đường/ngập lụt | chỉ đường static (OSRM/Goong không tính thời tiết & tắc đường real-time) |
 | Review | Precision / Recall / F1 theo khía cạnh | — |
 
 Khi thêm một tính năng, thêm cả cách đo nó. Tính năng không đo được không phải đóng góp.

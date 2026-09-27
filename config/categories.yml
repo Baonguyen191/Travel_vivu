@@ -1,0 +1,79 @@
+wikidata:
+  Q16970: chua          # nhà thờ / kiến trúc tôn giáo
+  Q24398318: chua       # chùa Phật giáo
+  Q33506: bao_tang       # bảo tàng
+  Q751876: di_tich      # lâu đài, cung điện
+  Q39614: lang_tam      # nghĩa trang, lăng mộ
+  Q22698: cong_vien
+  Q11707: nha_hang
+  Q30022: quan_ca_phe
+  Q40080: bai_bien
+  Q4022: song            # sông
+  # --- bổ sung từ dữ liệu staged thực tế (task 8, các class xuất hiện >= 2 lần) ---
+  Q27686: khach_san            # hotel
+  Q654772: khach_san           # hostel
+  Q687188: don_vi_hanh_chinh   # wards of Vietnam / phường
+  Q2389082: don_vi_hanh_chinh  # commune of Vietnam / xã
+  Q2582669: don_vi_hanh_chinh  # district / huyện
+  Q6644510: don_vi_hanh_chinh  # urban district / quận
+  Q1070942: don_vi_hanh_chinh  # commune-level town / thị trấn
+  Q12280: diem_tham_quan       # bridge / cầu (vd. Cầu Trường Tiền)
+  Q381885: lang_tam            # tomb / lăng mộ
+  Q162875: lang_tam            # mausoleum / lăng
+  Q41176: di_tich               # building / công trình — class chung chung; map di_tich
+                                 # dựa trên các bản ghi staged hiện tại (đều nằm trong
+                                 # hoàng thành/lăng tẩm), KHÔNG an toàn cho mọi "building"
+                                 # nói chung — kiểm tra lại nếu refresh dữ liệu
+  Q276173: di_tich              # pavilion / lầu, đình
+  Q16560: di_tich               # palace / cung điện
+  Q53060: di_tich               # gate / cổng (vd. Ngọ Môn)
+  Q245016: di_tich              # military base / căn cứ quân sự — class chung chung; map
+                                 # di_tich dựa trên 3 bản ghi staged hiện tại (căn cứ thời
+                                 # chiến tranh VN, có giá trị lịch sử), KHÔNG an toàn cho
+                                 # mọi "military base" nói chung — kiểm tra lại nếu refresh
+  Q10748583: chua               # Buddhist temple in Vietnam / chùa Việt Nam
+  Q5393308: chua                # Buddhist temple / chùa
+  Q10948212: chua               # Confucian royal ancestral shrine / miếu thờ tổ tiên hoàng gia
+  Q618618: chua                 # temple of Confucius / văn miếu
+  # --- Không phải điểm đến: tách khỏi "khac" để RAG và bộ lập lịch loại ra ---
+  # Trước đây để "khac", nhưng "khac" lẫn cả điểm tham quan thật (Kinh thành,
+  # Đàn Nam Giao, Lăng Kiến Phúc) nên không lọc theo category được. Các bài
+  # Wikipedia của nhóm này (thành phố Huế, triều đại, trận đánh...) chiếm gần
+  # nửa kho chunk và chen vào top-k của RAG (data/qa/rag_benchmark_2026-09-26.md).
+  # boi_canh: thực thể lịch sử/hành chính, không đến thăm được.
+  Q27554677: boi_canh    # former capital / cố đô (bản ghi "Huế")
+  Q3455658: boi_canh     # regions of Vietnam / vùng
+  Q164950: boi_canh      # dynasty / triều đại
+  Q12552047: boi_canh    # lord / lãnh chúa (Chúa Nguyễn)
+  Q3024240: boi_canh     # historical country / cựu quốc gia
+  Q48349: boi_canh       # empire / đế quốc
+  Q178561: boi_canh      # battle / trận đánh
+  Q645883: boi_canh      # military operation / hoạt động quân sự
+  Q273120: boi_canh      # protest / biểu tình
+  # ha_tang: công trình phục vụ dân sinh, không phải điểm tham quan.
+  Q55488: ha_tang        # railway station / ga
+  Q695850: ha_tang       # airbase / sân bay quân sự
+  Q16917: ha_tang        # hospital / bệnh viện
+  Q3918: ha_tang         # university / đại học
+  Q4671277: ha_tang      # academic institution / học viện
+  Q483110: ha_tang       # stadium / sân vận động
+  Q12323: ha_tang        # dam / đập
+  # Q515 (city) cố ý KHÔNG map: "Cố đô Huế" (quần thể di tích UNESCO) cũng mang
+  # class này, map thì mất một điểm đến chính.
+osm:
+  - { match: { amenity: restaurant }, category: nha_hang }
+  - { match: { amenity: fast_food }, category: nha_hang }
+  - { match: { amenity: cafe }, category: quan_ca_phe }
+  - { match: { tourism: museum }, category: bao_tang }
+  - { match: { tourism: gallery }, category: bao_tang }
+  - { match: { tourism: viewpoint }, category: diem_ngam_canh }
+  - { match: { tourism: artwork }, category: di_tich }
+  - { match: { historic: tomb }, category: lang_tam }
+  - { match: { historic: castle }, category: di_tich }
+  - { match: { historic: city_gate }, category: di_tich }
+  - { match: { historic: "*" }, category: di_tich }
+  - { match: { amenity: place_of_worship }, category: chua }
+  - { match: { leisure: park }, category: cong_vien }
+  - { match: { leisure: garden }, category: cong_vien }
+  - { match: { natural: beach }, category: bai_bien }
+  - { match: { tourism: attraction }, category: diem_tham_quan }

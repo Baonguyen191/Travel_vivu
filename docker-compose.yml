@@ -1,0 +1,15 @@
+services:
+  db:
+    build: ./db
+    environment:
+      POSTGRES_USER: travel
+      POSTGRES_PASSWORD: travel
+      POSTGRES_DB: travel
+    ports: ["5433:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travel -d travel"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:

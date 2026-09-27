@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "travel-pipeline"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+  "httpx>=0.28",
+  "psycopg[binary]>=3.2",
+  "PyYAML>=6.0",
+  "selectolax>=0.3.21",
+  "trafilatura>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-httpx>=0.35"]
+embed = ["sentence-transformers>=3.0"]
+
+[tool.setuptools.packages.find]
+include = ["pipeline*", "rag*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: cần PostgreSQL đang chạy"]

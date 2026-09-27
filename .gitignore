@@ -1,6 +1,5 @@
 # Dữ liệu thô và kết quả QA — sinh lại được bằng pipeline
-data/raw/
-data/qa/
+data/
 
 # Bí mật
 .env
@@ -20,3 +19,9 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Scratch của quy trình subagent-driven development
+.superpowers/
+
+# Build artifact của pip install -e .
+*.egg-info/

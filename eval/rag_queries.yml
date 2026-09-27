@@ -1,0 +1,289 @@
+# Bộ câu hỏi gán nhãn tay cho benchmark truy hồi RAG (python -m rag.benchmark).
+#
+# Bản đầu do Claude soạn từ kiến thức chung về Huế, QID lấy từ
+# data/staged/wikidata.json. Mọi câu đang `reviewed: false`: người làm đồ án
+# kiểm lại nhãn (địa danh đúng, từ khoá có thật trong bài Wikipedia) rồi mới
+# đổi thành true. Báo cáo benchmark cảnh báo khi còn câu chưa kiểm duyệt.
+#
+# Trường:
+#   id              duy nhất, không đổi khi sửa câu (kết quả cũ tham chiếu theo id)
+#   query           câu người dùng thật có thể hỏi
+#   type            fact          hỏi một chi tiết, thường có answer_keywords
+#                   descriptive   hỏi chung về một địa danh, có nêu tên
+#                   paraphrase    mô tả địa danh mà không nêu tên (BM25 khó)
+#                   multi         nhiều địa danh cùng đúng; đo thêm Recall@k
+#                   no_diacritics gõ không dấu, như người dùng thật hay gõ
+#   relevant        mọi địa danh mà chunk của nó được coi là đúng (qid bắt buộc,
+#                   name chỉ để người đọc)
+#   answer_keywords (tuỳ chọn) chunk đúng phải chứa đủ các chuỗi này, không phân
+#                   biệt hoa thường. Chỉ ghi chuỗi chắc chắn có trong bài Wikipedia.
+#   category        (tuỳ chọn) truyền vào filter category của retriever
+#   reviewed        true khi người đã kiểm nhãn
+#
+# Mục tiêu: 50–100 câu, mỗi loại ít nhất 8 câu. Viết thêm câu từ câu hỏi
+# thật của người dùng thử nếu có.
+
+- id: q001
+  query: Chùa Thiên Mụ được xây dựng vào năm nào?
+  type: fact
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  answer_keywords: ["1601"]
+  reviewed: false
+
+- id: q002
+  query: Tháp Phước Duyên ở chùa Thiên Mụ có mấy tầng?
+  type: fact
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  reviewed: false
+
+- id: q003
+  query: Ngôi chùa cổ có tháp bảy tầng nằm trên đồi bên bờ sông Hương
+  type: paraphrase
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  reviewed: false
+
+- id: q004
+  query: Lăng vua Tự Đức còn có tên gọi khác là gì?
+  type: fact
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  answer_keywords: ["Khiêm Lăng"]
+  reviewed: false
+
+- id: q005
+  query: Lăng của vị vua làm nhiều thơ, có hồ Lưu Khiêm và Xung Khiêm tạ
+  type: paraphrase
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  reviewed: false
+
+- id: q006
+  query: Lăng Khải Định còn gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q7818621, name: Lăng Khải Định}
+  answer_keywords: ["Ứng Lăng"]
+  reviewed: false
+
+- id: q007
+  query: Lăng vua nào được trang trí bằng mảnh sành sứ ghép, pha kiến trúc phương Tây
+  type: paraphrase
+  relevant:
+    - {qid: Q7818621, name: Lăng Khải Định}
+  reviewed: false
+
+- id: q008
+  query: Tên chính thức của lăng vua Minh Mạng
+  type: fact
+  relevant:
+    - {qid: Q7481070, name: Lăng Minh Mạng}
+  answer_keywords: ["Hiếu Lăng"]
+  reviewed: false
+
+- id: q009
+  query: Lăng Gia Long có tên gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q7818615, name: Lăng Gia Long}
+  answer_keywords: ["Thiên Thọ"]
+  reviewed: false
+
+- id: q010
+  query: Lăng Thiệu Trị còn được gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q16511573, name: Lăng Thiệu Trị}
+  answer_keywords: ["Xương Lăng"]
+  reviewed: false
+
+- id: q011
+  query: Lăng Đồng Khánh có tên chữ là gì?
+  type: fact
+  relevant:
+    - {qid: Q10788196, name: Lăng Đồng Khánh}
+  answer_keywords: ["Tư Lăng"]
+  reviewed: false
+
+- id: q012
+  query: Các lăng tẩm của vua triều Nguyễn ở Huế
+  type: multi
+  relevant:
+    - {qid: Q7818615, name: Lăng Gia Long}
+    - {qid: Q7481070, name: Lăng Minh Mạng}
+    - {qid: Q16511573, name: Lăng Thiệu Trị}
+    - {qid: Q7481171, name: Lăng Tự Đức}
+    - {qid: Q10788178, name: Lăng Dục Đức}
+    - {qid: Q49079720, name: Lăng Kiến Phúc}
+    - {qid: Q10788196, name: Lăng Đồng Khánh}
+    - {qid: Q7818621, name: Lăng Khải Định}
+  reviewed: false
+
+- id: q013
+  query: Cổng chính phía nam của Hoàng thành Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q7023311, name: Ngọ Môn}
+    - {qid: Q10769129, name: Hoàng thành Huế}
+  reviewed: false
+
+- id: q014
+  query: Nơi vua nhà Nguyễn thiết triều và tổ chức đại lễ trong Hoàng thành
+  type: paraphrase
+  relevant:
+    - {qid: Q6826745, name: Điện Thái Hòa}
+    - {qid: Q10769129, name: Hoàng thành Huế}
+  reviewed: false
+
+- id: q015
+  query: Chín cái đỉnh đồng đúc thời Minh Mạng đặt trước Thế Miếu
+  type: paraphrase
+  relevant:
+    - {qid: Q10752805, name: Cửu Đỉnh}
+    - {qid: Q3211275, name: Thế Tổ Miếu}
+  reviewed: false
+
+- id: q016
+  query: Bảo tàng Cổ vật Cung đình Huế đặt trong tòa điện nào?
+  type: fact
+  relevant:
+    - {qid: Q5929149, name: Bảo tàng Cổ vật Cung đình Huế}
+    - {qid: Q10840231, name: Điện Long An}
+  answer_keywords: ["Long An"]
+  reviewed: false
+
+- id: q017
+  query: Nơi vua nhà Nguyễn làm lễ tế trời đất
+  type: paraphrase
+  relevant:
+    - {qid: Q10840433, name: Đàn Nam Giao}
+  reviewed: false
+
+- id: q018
+  query: Cây cầu sắt bắc qua sông Hương xây thời Pháp thuộc, có sáu nhịp
+  type: paraphrase
+  relevant:
+    - {qid: Q10752407, name: Cầu Trường Tiền}
+  reviewed: false
+
+- id: q019
+  query: Giới thiệu về chợ Đông Ba
+  type: descriptive
+  relevant:
+    - {qid: Q97273263, name: Chợ Đông Ba}
+  reviewed: false
+
+- id: q020
+  query: Ngôi chùa ở Huế gắn với các thái giám triều Nguyễn
+  type: paraphrase
+  relevant:
+    - {qid: Q10748576, name: Chùa Từ Hiếu}
+  reviewed: false
+
+- id: q021
+  query: Chùa Từ Đàm có vai trò gì trong lịch sử Phật giáo Việt Nam?
+  type: descriptive
+  relevant:
+    - {qid: Q7850514, name: Chùa Từ Đàm}
+  reviewed: false
+
+- id: q022
+  query: Cung điện của vua Khải Định khi còn là thái tử, kiến trúc pha phương Tây
+  type: paraphrase
+  relevant:
+    - {qid: Q10751137, name: Cung An Định}
+  reviewed: false
+
+- id: q023
+  query: Nhà thờ chính tòa Phủ Cam được xây dựng như thế nào?
+  type: descriptive
+  relevant:
+    - {qid: Q28197251, name: Nhà thờ chính tòa Phủ Cam}
+  reviewed: false
+
+- id: q024
+  query: Nơi thờ Khổng Tử và dựng bia tiến sĩ triều Nguyễn ở Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q10833485, name: Văn miếu Huế}
+  reviewed: false
+
+- id: q025
+  query: Cửa biển nơi phá Tam Giang thông ra biển Đông
+  type: paraphrase
+  relevant:
+    - {qid: Q10752775, name: Cửa Thuận An}
+    - {qid: Q10825419, name: Thuận An}
+  reviewed: false
+
+- id: q026
+  query: Tòa thành bao quanh Hoàng thành Huế xây theo kiểu Vauban
+  type: paraphrase
+  relevant:
+    - {qid: Q877185, name: Kinh thành Huế}
+  reviewed: false
+
+- id: q027
+  query: Cây cầu có mái ngói cổ ở làng quê gần Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q10752425, name: Cầu ngói Thanh Toàn}
+  reviewed: false
+
+- id: q028
+  query: Sông Hương bắt nguồn từ đâu?
+  type: descriptive
+  relevant:
+    - {qid: Q1515971, name: Sông Hương}
+  reviewed: false
+
+- id: q029
+  query: Các ngôi chùa nổi tiếng ở Huế
+  type: multi
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+    - {qid: Q10748576, name: Chùa Từ Hiếu}
+    - {qid: Q7850514, name: Chùa Từ Đàm}
+    - {qid: Q7272817, name: Chùa Quốc Ân}
+    - {qid: Q5275217, name: Chùa Diệu Đế}
+  reviewed: false
+
+- id: q030
+  query: Các miếu thờ trong Hoàng thành Huế
+  type: multi
+  relevant:
+    - {qid: Q3211275, name: Thế Tổ Miếu}
+    - {qid: Q10825789, name: Thái Tổ Miếu}
+    - {qid: Q10828164, name: Triệu Tổ Miếu}
+  reviewed: false
+
+- id: q031
+  query: lang tu duc co gi dep
+  type: no_diacritics
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  reviewed: false
+
+- id: q032
+  query: chua thien mu xay nam nao
+  type: no_diacritics
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  reviewed: false
+
+- id: q033
+  query: cau truong tien dai bao nhieu
+  type: no_diacritics
+  relevant:
+    - {qid: Q10752407, name: Cầu Trường Tiền}
+  reviewed: false
+
+- id: q034
+  query: dai noi hue gom nhung cong trinh nao
+  type: no_diacritics
+  relevant:
+    - {qid: Q10769129, name: Hoàng thành Huế}
+    - {qid: Q2234243, name: Cố đô Huế}
+  reviewed: false
