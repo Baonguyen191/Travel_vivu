@@ -244,6 +244,27 @@ commit):
 - `data/generated/` — file sinh ra dùng lại cho lần chạy sau (ví dụ
   `city_hue_boundary.wkt`).
 
+## Chatbot demo
+
+```powershell
+pip install -e ".[embed,demo,llm]"
+streamlit run demo/app.py
+```
+
+Cần database đang chạy và đã `python -m pipeline embed`.
+
+- `OPENAI_API_KEY` (trong `.env` hoặc biến môi trường): bật agent LLM tool-calling và nhận diện
+  ảnh bằng vision LLM. Không có key thì demo chạy chế độ luật (nhận ý định bằng từ khoá).
+- Thời gian đi và tuyến đường thật, miễn phí: dựng OSRM một lần rồi chạy service:
+  ```powershell
+  python scripts/setup_osrm.py                    # tải bản đồ OSM Việt Nam, xử lý ~20 phút, cần ~8 GB RAM Docker
+  docker compose --profile routing up -d osrm     # http://localhost:5100
+  ```
+  Dữ liệu nằm trong Docker volume `travel_osrm`, không nằm trong repo (repo ở OneDrive).
+- `GOOGLE_MAPS_API_KEY`: thời gian đi có giao thông từ Google Routes. Project phải bật Routes API
+  và billing. Không có OSRM lẫn Google thì thời gian đi là ước lượng. Kịch bản trình bày:
+[docs/demo/kich-ban-demo.md](docs/demo/kich-ban-demo.md).
+
 ## Chạy test
 
 ```bash
