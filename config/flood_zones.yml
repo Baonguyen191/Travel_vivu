@@ -1,0 +1,13 @@
+# Vùng dễ ngập ở Huế, dùng để phạt / né tuyến đường khi dự báo mưa lớn (maps/flood.py).
+#
+# Chưa có vùng nào: OSM không có đường nào ở Huế gắn flood_prone=yes, và chưa có
+# bản đồ ngập chính thức được đưa vào dự án. Chỉ thêm vùng có nguồn kiểm chứng được;
+# `source` là bắt buộc (URL hoặc tên tài liệu).
+#
+# Định dạng mỗi vùng (hình tròn):
+# - name: "Tên đoạn đường / khu vực"
+#   lat: 16.xxxx
+#   lon: 107.xxxx
+#   radius_m: 300
+#   source: "https://... hoặc tên báo cáo, ngày"
+[]

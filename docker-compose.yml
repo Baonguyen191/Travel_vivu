@@ -11,5 +11,16 @@ services:
       test: ["CMD-SHELL", "pg_isready -U travel -d travel"]
       interval: 5s
       retries: 10
+  # Định tuyến đường bộ miễn phí (OpenStreetMap). Dựng dữ liệu một lần bằng
+  # `python scripts/setup_osrm.py` rồi `docker compose up -d osrm`.
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v6.0.0
+    command: osrm-routed --algorithm mld /data/map.osrm
+    ports: ["5100:5000"]
+    volumes: ["osrm:/data"]
+    profiles: ["routing"]
 volumes:
   pgdata:
+  osrm:
+    external: true
+    name: travel_osrm

@@ -10,6 +10,7 @@ dependencies = [
   "httpx>=0.28",
   "psycopg[binary]>=3.2",
   "PyYAML>=6.0",
+  "ortools>=9.10",
   "selectolax>=0.3.21",
   "trafilatura>=2.0",
 ]
@@ -17,9 +18,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-httpx>=0.35"]
 embed = ["sentence-transformers>=3.0"]
+demo = ["streamlit>=1.40"]
+llm = ["openai>=1.60"]
 
 [tool.setuptools.packages.find]
-include = ["pipeline*", "rag*"]
+include = ["pipeline*", "rag*", "planner*", "maps*", "agent*", "recognition*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
