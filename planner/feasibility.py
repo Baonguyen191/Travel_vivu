@@ -59,10 +59,15 @@ def check_feasibility(result: ScheduleResult, places: dict[int | str, Place],
         if n > 1:
             report.violations.append(Violation("duplicate", None, pid, f"đi {n} lần"))
 
-    spent = 0
+    # Gộp theo ngày: lịch do LLM viết có khi tách một ngày thành nhiều mục cùng ngày,
+    # kiểm riêng từng mục sẽ lọt vi phạm số điểm/ngày và thời gian đi giữa hai mục.
+    by_day: dict[date, list] = {}
     for itinerary in result.itineraries:
-        day = itinerary.date
-        visits = sorted(itinerary.visits, key=lambda v: v.arrival_time)
+        by_day.setdefault(itinerary.date, []).extend(itinerary.visits)
+
+    spent = 0
+    for day, day_visits in by_day.items():
+        visits = sorted(day_visits, key=lambda v: v.arrival_time)
         report.visits += len(visits)
         if not visits:
             continue

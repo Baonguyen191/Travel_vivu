@@ -20,7 +20,10 @@ docker compose --profile routing up -d osrm # thời gian đi theo đường th�
 streamlit run demo/app.py
 ```
 
-`OPENAI_API_KEY` đặt trong file `.env` ở gốc repo (demo tự đọc) hoặc biến môi trường.
+LLM mặc định chạy local qua Ollama: trong `.env` ở gốc repo (demo tự đọc) có
+`OPENAI_BASE_URL=http://localhost:11434/v1` và `OPENAI_MODEL=qwen3.5:9b`. Mở Ollama trước khi demo
+và hỏi thử một câu để nạp model vào GPU (lần đầu vài chục giây). Dùng OpenAI thì bỏ
+`OPENAI_BASE_URL` và đặt `OPENAI_API_KEY`.
 
 Tải sẵn ảnh cho cảnh 5 (ảnh Wikimedia Commons, CC BY 4.0, tác giả Chainwit.), lưu
 thành `truong-tien.jpg` ở máy, không cần đưa vào repo:
@@ -29,11 +32,11 @@ Nếu có ảnh tự chụp ở Huế thì dùng ảnh đó sẽ thuyết phục
 
 Kiểm tra trước khi lên:
 
-- [ ] Thanh bên: "Bộ xử lý ngôn ngữ" đang ở **LLM**, dưới có dòng `Model gpt-5.4-mini`.
+- [ ] Thanh bên: "Bộ xử lý ngôn ngữ" đang ở **LLM**, dưới có dòng `Model qwen3.5:9b (local)`.
 - [ ] Thanh bên: "Nguồn thời gian đi" đang ở **OSRM**, có dòng "OSRM: đường thật, miễn phí".
 - [ ] Trang không báo lỗi PostgreSQL; hỏi thử một câu (lần đầu ~15 giây để nạp bge-m3).
 - [ ] Bấm lần lượt các câu hỏi mẫu ở thanh bên, câu nào cũng ra kết quả.
-- [ ] Máy có mạng: cần cho OpenAI và Open-Meteo (OSRM chạy trên máy, không cần mạng).
+- [ ] Ollama đang chạy (`ollama ps` thấy `qwen3.5:9b`). Máy có mạng: cần cho Open-Meteo (LLM và OSRM chạy trên máy).
 - [ ] Bấm "Xoá hội thoại" trước khi bắt đầu.
 
 Thanh bên để mặc định: xe máy, 4 điểm/ngày, bật so sánh với lịch không tính thời tiết.
@@ -155,7 +158,7 @@ Nói:
 | Sự cố | Xử lý |
 |---|---|
 | Trang báo không kết nối PostgreSQL | `docker compose up -d db`, tải lại trang |
-| OpenAI lỗi, hết hạn mức, mất mạng | App tự trả lời bằng chế độ luật và ghi "LLM lỗi"; hoặc chuyển thanh bên sang **Luật**. Chế độ luật chạy được cảnh 1, 2, 4 bằng các câu hỏi mẫu, không nhận diện ảnh |
+| LLM lỗi (Ollama chưa chạy, OpenAI hết hạn mức, mất mạng) | App tự trả lời bằng chế độ luật và ghi "LLM lỗi"; hoặc chuyển thanh bên sang **Luật**. Chế độ luật chạy được cảnh 1, 2, 4 bằng các câu hỏi mẫu, không nhận diện ảnh |
 | Mất mạng hoàn toàn | Cảnh 1, 2 (chế độ luật) vẫn chạy. Cảnh 3–4 cần Open-Meteo: mở data/qa/planner_experiment_2026-09-27_osrm.md và trình bày số liệu |
 | OSRM không chạy | Thanh bên báo; chọn "Ước lượng" hoặc chạy `docker compose --profile routing up -d osrm` |
 | Câu hỏi đầu chậm | Model bge-m3 đang nạp (~15 giây) |

@@ -301,6 +301,17 @@ def test_feasibility_catches_each_violation_kind():
     assert not report.feasible
 
 
+def test_feasibility_merges_itineraries_of_same_date():
+    # LLM có khi tách một ngày thành hai mục cùng ngày; phải kiểm như một ngày.
+    split = ScheduleResult(itineraries=[
+        DayItinerary(DAY, [_visit(LANG, "08:30", "10:00")]),
+        DayItinerary(DAY, [_visit(CHUA, "10:05", "11:00"), _visit(BAO_TANG, "11:30", "12:30")]),
+    ])
+    report = check_feasibility(split, {p.id: p for p in (LANG, CHUA, BAO_TANG)}, constraint(max_places_per_day=2))
+    assert report.count("max_places") == 1
+    assert report.count("travel") == 1  # lăng → chùa không kịp 5 phút
+
+
 def test_feasibility_counts_unverified_hours():
     result = ScheduleResult(itineraries=[DayItinerary(DAY, [_visit(LANG, "08:30", "10:00")])])
     report = check_feasibility(result, {LANG.id: LANG}, constraint())

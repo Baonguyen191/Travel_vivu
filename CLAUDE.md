@@ -17,7 +17,7 @@ LLM agent điều phối + tools. LLM (có khả năng đọc ảnh) hiểu yêu
 | Thành phần | Lựa chọn |
 |---|---|
 | Backend | FastAPI (Python) |
-| Điều phối agent | Tool-calling qua OpenAI Chat Completions (`agent/`, model mặc định `gpt-5.4-mini`, đổi bằng `OPENAI_MODEL`); không có key thì chạy chế độ luật (`agent/nlu.py`) |
+| Điều phối agent | Tool-calling qua API tương thích OpenAI Chat Completions (`agent/llm.py`). Mặc định Ollama local `qwen3.5:9b` (`OPENAI_BASE_URL=http://localhost:11434/v1`, `OLLAMA_CONTEXT_LENGTH=8192`), dự phòng `qwen3.5:4b`; OpenAI `gpt-5.4-mini` khi bỏ `OPENAI_BASE_URL` và có key; Gemini qua endpoint tương thích OpenAI cho baseline. Đổi bằng `OPENAI_BASE_URL` / `OPENAI_MODEL`; không có key lẫn server local thì chạy chế độ luật (`agent/nlu.py`). Chọn model bằng số liệu: `python scripts/llm_smoke_test.py` |
 | CSDL | PostgreSQL + PostGIS + pgvector |
 | Cache | Redis (dựng khi có backend API) |
 | Lưu file | `data/raw/` trên đĩa; chuyển sang MinIO khi có backend |
@@ -25,7 +25,7 @@ LLM agent điều phối + tools. LLM (có khả năng đọc ảnh) hiểu yêu
 | Thời tiết | Open-Meteo |
 | Chỉ đường | OSRM tự host (mặc định, miễn phí, `maps/osrm.py`, dữ liệu OSM Việt Nam trong Docker volume `travel_osrm`); Google Routes (`maps/client.py`) khi cần giao thông và có billing; không có cả hai thì ước lượng. Chọn nguồn: `maps/routing.py`. Dẫn đường bằng deep link Maps URLs |
 
-Các dịch vụ mặc định dùng API miễn phí: Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Sử dụng **Google Maps API** cho riêng tính năng chỉ đường và ma trận giao thông/tắc đường real-time. Dùng **OpenAI API** cho agent (trích ràng buộc, diễn giải kết quả tool) và vision LLM ở tầng 3 nhận diện ảnh; mọi thông tin đúng/sai vẫn đến từ tool. Không dùng Google Places / Foursquare. Key đặt trong `.env` hoặc biến môi trường, không bao giờ commit.
+Các dịch vụ mặc định dùng API miễn phí: Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Sử dụng **Google Maps API** cho riêng tính năng chỉ đường và ma trận giao thông/tắc đường real-time. Dùng **LLM qua API tương thích OpenAI** (mặc định Ollama local, miễn phí) cho agent (trích ràng buộc, diễn giải kết quả tool) và vision LLM ở tầng 3 nhận diện ảnh; mọi thông tin đúng/sai vẫn đến từ tool. Model phải có cả vision lẫn tools (qwen3.5 có; phần lớn vision model khác trên Ollama không nhận tools). Gọi Ollama `/v1` với `reasoning_effort="none"` để tắt thinking (`extra_body={"think": false}` không có tác dụng trên Ollama 0.17). Không dùng Google Places / Foursquare. Key đặt trong `.env` hoặc biến môi trường, không bao giờ commit.
 
 Python 3.14 trên máy phát triển. Tránh Scrapy (chưa chắc có wheel); dùng `httpx`, `selectolax`, `trafilatura`, `psycopg` v3.
 
@@ -124,5 +124,6 @@ Khi thêm một tính năng, thêm cả cách đo nó. Tính năng không đo đ
   - Data Pipeline (Crawl, normalize, PostGIS/pgvector storage).
   - Hybrid RAG (BAAI/bge-m3 + BM25 multi/fold + RRF fusion + benchmark engine).
   - Bộ lập lịch thích ứng thời tiết (`planner/`, thiết kế: docs/superpowers/specs/2026-09-27-weather-aware-schedule-optimizer-design.md): VRPTW nhiều ngày, bản sao theo khung giờ, ràng buộc cứng theo `unsafe_conditions`, tầng thời tiết theo khoảng cách tới ngày đi, thực nghiệm trên thời tiết lịch sử (data/qa/planner_experiment_2026-09-27.md).
-- **Còn thiếu:** chạy baseline LLM thật (mới có công cụ sinh prompt và chấm); giờ mở cửa (9/208 điểm tham quan) và giá vé (1 điểm) trong DB; kiểm định chuyến 2 ngày. Kết quả chính dùng thời gian đi OSRM (data/qa/planner_experiment_2026-09-27_osrm.md): 1 ngày giảm 14% giờ ngoài trời khi mưa (oracle 38%), 2 ngày giảm 11% (oracle 35%); với thời gian đi ước lượng là 38% (oracle 59%). Mức giảm nhạy với việc lịch baseline tình cờ trùng giờ mưa: nên thêm baseline lấy trung bình nhiều thứ tự ngẫu nhiên để số liệu ổn định hơn.
+- **Baseline LLM tự lập lịch** (`python -m planner.experiment llm-collect` rồi `run --llm-dir`, lịch cache ở `eval/llm_schedules/`): `gpt-5.4-mini` đã chạy đủ 1 ngày (`none`, `medium`) và 2 ngày (`none`); 2 ngày `medium` mới 17/122 lịch (hết credit OpenAI). Kết quả: data/qa/planner_experiment_2026-09-29_osrm_llm_*.md. Baseline trên model local/Gemini chạy cùng lệnh với `--base-url`.
+- **Còn thiếu:** giờ mở cửa (9/208 điểm tham quan) và giá vé (1 điểm) trong DB; kiểm định chuyến 2 ngày. Kết quả chính dùng thời gian đi OSRM (data/qa/planner_experiment_2026-09-27_osrm.md): 1 ngày giảm 14% giờ ngoài trời khi mưa (oracle 38%), 2 ngày giảm 11% (oracle 35%); với thời gian đi ước lượng là 38% (oracle 59%). Mức giảm nhạy với việc lịch baseline tình cờ trùng giờ mưa: nên thêm baseline lấy trung bình nhiều thứ tự ngẫu nhiên để số liệu ổn định hơn.
 

@@ -10,7 +10,7 @@ from PIL import Image
 from psycopg.types.json import Jsonb
 
 from agent.agent import SYSTEM_PROMPT, run_agent
-from agent.llm import load_openai_key
+from agent.llm import llm_from_env, load_openai_key
 from agent.tools import TOOLS, AgentContext, execute_tool, resolve_places
 from rag.lexical import BM25Retriever, load_corpus
 from recognition.landmark import read_gps, recognize
@@ -128,6 +128,29 @@ def test_load_openai_key_prefers_environment(monkeypatch, tmp_path):
     assert load_openai_key() == "sk-file"
     env.write_text("OPENAI_API_KEY=\n", encoding="utf-8")
     assert load_openai_key() is None
+
+
+def test_llm_from_env_supports_local_and_openai(monkeypatch, tmp_path):
+    for name in ("OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    env = tmp_path / ".env"
+    monkeypatch.setattr("agent.llm.ENV_FILE", env)
+    env.write_text("", encoding="utf-8")
+    assert llm_from_env() is None  # không key, không server local: chế độ luật
+
+    # Ollama: không cần key, model và base_url đọc từ .env, tắt thinking.
+    env.write_text("OPENAI_BASE_URL=http://localhost:11434/v1\nOPENAI_MODEL=qwen3.5:9b\n", encoding="utf-8")
+    local = llm_from_env()
+    assert local.model == "qwen3.5:9b" and local.provider == "local" and local.reasoning_effort == "none"
+
+    # OpenAI: gpt-5 cần reasoning_effort none để dùng tools; tham số rõ ràng thắng mặc định.
+    env.write_text("OPENAI_API_KEY=sk-file\n", encoding="utf-8")
+    assert llm_from_env().provider == "openai" and llm_from_env().reasoning_effort == "none"
+    assert llm_from_env(reasoning_effort="medium", model=None).reasoning_effort == "medium"
+
+    # Nhà cung cấp khác (Gemini): không tự gửi reasoning_effort.
+    gemini = llm_from_env(base_url="https://generativelanguage.googleapis.com/v1beta/openai/", model="gemini-x")
+    assert gemini.reasoning_effort is None and gemini.provider == "generativelanguage.googleapis.com"
 
 
 # -- nhận diện ảnh -----------------------------------------------------------------

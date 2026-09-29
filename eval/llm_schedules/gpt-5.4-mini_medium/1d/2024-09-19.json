@@ -1,0 +1,29 @@
+{
+  "days": [
+    {
+      "date": "2024-09-19",
+      "visits": [
+        {
+          "place_id": 884,
+          "arrival": "08:05",
+          "departure": "09:05"
+        },
+        {
+          "place_id": 373,
+          "arrival": "09:08",
+          "departure": "12:08"
+        },
+        {
+          "place_id": 604,
+          "arrival": "12:11",
+          "departure": "13:11"
+        },
+        {
+          "place_id": 590,
+          "arrival": "13:19",
+          "departure": "14:49"
+        }
+      ]
+    }
+  ]
+}

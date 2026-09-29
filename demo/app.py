@@ -4,8 +4,8 @@
 
 Cần: PostgreSQL đang chạy (docker compose up -d db), đã chạy pipeline và
 `python -m pipeline embed`. Tuỳ chọn, trong biến môi trường hoặc file .env:
-OPENAI_API_KEY để bật agent LLM và nhận diện ảnh; GOOGLE_MAPS_API_KEY cho thời
-gian đi có giao thông.
+OPENAI_API_KEY (hoặc OPENAI_BASE_URL trỏ tới Ollama local) để bật agent LLM và
+nhận diện ảnh; GOOGLE_MAPS_API_KEY cho thời gian đi có giao thông.
 """
 
 import os
@@ -22,7 +22,7 @@ import pydeck as pdk  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from agent.agent import run_agent  # noqa: E402
-from agent.llm import LLMClient, load_env_value, load_openai_key  # noqa: E402
+from agent.llm import LLMClient, llm_from_env, load_env_value  # noqa: E402
 from agent.nlu import detect_intent, fold, match_landmarks, parse_date, parse_trip  # noqa: E402
 from agent.tools import (  # noqa: E402
     TIER_LABEL, AgentContext, extractive_answer, run_place_facts, run_plan, run_search_knowledge, run_weather,
@@ -74,8 +74,7 @@ def get_retriever():
 
 def get_llm() -> LLMClient | None:
     if "_llm" not in st.session_state:
-        key = load_openai_key()
-        st.session_state["_llm"] = LLMClient(key) if key else None
+        st.session_state["_llm"] = llm_from_env()
     return st.session_state["_llm"]
 
 
@@ -103,12 +102,14 @@ with st.sidebar:
     st.header("Cài đặt demo")
     brain = st.segmented_control(
         "Bộ xử lý ngôn ngữ", ["LLM", "Luật"], default="LLM" if llm else "Luật",
-        help="LLM: OpenAI gọi công cụ (tool-calling). Luật: nhận ý định bằng từ khoá, không cần API.")
+        help="LLM: model gọi công cụ (tool-calling) qua API tương thích OpenAI (OpenAI, Ollama local, Gemini)."
+             " Luật: nhận ý định bằng từ khoá, không cần API.")
     if brain == "LLM" and llm is None:
-        st.warning("Chưa có OPENAI_API_KEY (biến môi trường hoặc .env); dùng chế độ luật.")
+        st.warning("Chưa cấu hình LLM: đặt OPENAI_API_KEY, hoặc OPENAI_BASE_URL=http://localhost:11434/v1 để dùng"
+                   " Ollama (biến môi trường hoặc .env); đang dùng chế độ luật.")
     use_llm = brain == "LLM" and llm is not None
     if llm:
-        st.caption(f"Model `{llm.model}` · {llm.usage.calls} lần gọi · "
+        st.caption(f"Model `{llm.model}` ({llm.provider}) · {llm.usage.calls} lần gọi · "
                    f"{llm.usage.input_tokens + llm.usage.output_tokens:,} token trong phiên")
 
     hotel_name = st.selectbox("Nơi ở", list(HOTELS))

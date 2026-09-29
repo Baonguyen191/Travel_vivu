@@ -253,8 +253,16 @@ streamlit run demo/app.py
 
 Cần database đang chạy và đã `python -m pipeline embed`.
 
-- `OPENAI_API_KEY` (trong `.env` hoặc biến môi trường): bật agent LLM tool-calling và nhận diện
-  ảnh bằng vision LLM. Không có key thì demo chạy chế độ luật (nhận ý định bằng từ khoá).
+- LLM (agent tool-calling và nhận diện ảnh bằng vision LLM) qua API tương thích OpenAI. Mặc định
+  Ollama local, miễn phí:
+  ```powershell
+  winget install Ollama.Ollama
+  setx OLLAMA_CONTEXT_LENGTH 8192     # rồi khởi động lại Ollama
+  ollama pull qwen3.5:9b              # thiếu VRAM thì qwen3.5:4b
+  ```
+  và trong `.env`: `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_MODEL=qwen3.5:9b`. Dùng
+  OpenAI thì bỏ `OPENAI_BASE_URL`, đặt `OPENAI_API_KEY`. Không cấu hình gì thì demo chạy chế độ
+  luật (nhận ý định bằng từ khoá). So sánh model: `python scripts/llm_smoke_test.py --n 10` (model theo `OPENAI_MODEL`).
 - Thời gian đi và tuyến đường thật, miễn phí: dựng OSRM một lần rồi chạy service:
   ```powershell
   python scripts/setup_osrm.py                    # tải bản đồ OSM Việt Nam, xử lý ~20 phút, cần ~8 GB RAM Docker

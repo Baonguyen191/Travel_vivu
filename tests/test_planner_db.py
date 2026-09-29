@@ -101,6 +101,54 @@ def test_experiment_run_end_to_end(db_conn, tmp_path):
 
 
 @pytest.mark.integration
+def test_llm_collect_and_score(db_conn, tmp_path):
+    from types import SimpleNamespace
+
+    from planner.experiment import collect_llm
+
+    lang = _insert(db_conn, "Lăng Tự Đức", "Q7481171", 16.4325, 107.566, visit=90)
+    bt = _insert(db_conn, "Bảo tàng", "Q5929149", 16.4713, 107.5819, category="bao_tang", indoor=0.95, unsafe=[])
+
+    def fetch(url, params, fresh):
+        start, end = date.fromisoformat(params["start_date"]), date.fromisoformat(params["end_date"])
+        suffix = "_previous_day1" if "previous-runs" in url else ""
+        return _payload(start, end, suffix, rain_hours={8, 9, 10, 11})
+
+    answers = {  # ngày 1: lịch hợp lệ; ngày 2: không phải JSON; ngày 3: đến lăng không kịp
+        "2025-10-01": [(bt, "08:30", "09:30"), (lang, "10:00", "11:30")],
+        "2025-10-03": [(bt, "08:05", "09:30"), (lang, "09:31", "11:00")],
+    }
+
+    class FakeLLM:
+        model, reasoning_effort = "fake", "none"
+
+        def chat(self, messages, json_mode=False):
+            prompt = messages[0]["content"]
+            day = next(d for d in ("2025-10-01", "2025-10-02", "2025-10-03") if f"từ {d}" in prompt)
+            if day not in answers:
+                return SimpleNamespace(content="Xin lỗi, tôi không lập được lịch.")
+            visits = [{"place_id": p, "arrival": a, "departure": d} for p, a, d in answers[day]]
+            return SimpleNamespace(content=json.dumps({"days": [{"date": day, "visits": visits}]}))
+
+    cfg = ExperimentConfig(
+        places=["Q7481171", "Q5929149"], hotel=(16.4637, 107.5909), transport_mode="motorbike",
+        day_start=time(8), day_end=time(18), max_places_per_day=2, lead_days=1,
+        periods=[(date(2025, 10, 1), date(2025, 10, 3))], scenarios=[Scenario("1 ngày", 1, 1)])
+    llm_dir = tmp_path / "llm"
+    summary = collect_llm(db_conn, cfg, FakeLLM(), llm_dir, workers=2, fetch_json=fetch)
+    assert summary == {"requested": 3, "failed": []}
+    assert collect_llm(db_conn, cfg, FakeLLM(), llm_dir, fetch_json=fetch)["requested"] == 0  # đã cache
+
+    report, rows = run(db_conn, cfg, time_limit_s=0.3, fetch_json=fetch, out_dir=None, llm_dir=str(llm_dir))
+    llm = {r["start"]: r for r in rows if r["variant"] == "llm"}
+    assert len(rows) == 3 * 4
+    assert llm["2025-10-01"]["feasible"] == 1 and llm["2025-10-01"]["travel_minutes"] > 0
+    assert llm["2025-10-02"]["solver_status"] == "llm_invalid" and llm["2025-10-02"]["feasible"] == 0
+    assert "travel" in llm["2025-10-03"]["violations"]
+    assert "aware − llm" in report and "`fake`" in report
+
+
+@pytest.mark.integration
 def test_plan_trip_end_to_end_with_fake_services(db_conn):
     import httpx
 
