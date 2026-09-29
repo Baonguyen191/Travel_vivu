@@ -1,0 +1,54 @@
+{
+  "days": [
+    {
+      "date": "2024-09-03",
+      "visits": [
+        {
+          "place_id": 689,
+          "arrival": "08:03",
+          "departure": "09:03"
+        },
+        {
+          "place_id": 373,
+          "arrival": "09:08",
+          "departure": "12:08"
+        },
+        {
+          "place_id": 884,
+          "arrival": "12:11",
+          "departure": "13:11"
+        },
+        {
+          "place_id": 604,
+          "arrival": "13:14",
+          "departure": "14:14"
+        }
+      ]
+    },
+    {
+      "date": "2024-09-04",
+      "visits": [
+        {
+          "place_id": 590,
+          "arrival": "08:10",
+          "departure": "09:40"
+        },
+        {
+          "place_id": 705,
+          "arrival": "09:47",
+          "departure": "10:47"
+        },
+        {
+          "place_id": 577,
+          "arrival": "11:06",
+          "departure": "12:21"
+        },
+        {
+          "place_id": 578,
+          "arrival": "12:26",
+          "departure": "13:41"
+        }
+      ]
+    }
+  ]
+}

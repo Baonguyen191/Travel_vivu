@@ -1,0 +1,13 @@
+{
+  "days": [
+    {
+      "date": "2025-11-26",
+      "visits": [
+        {"place_id": 884, "arrival": "08:08", "departure": "09:08"},
+        {"place_id": 604, "arrival": "09:16", "departure": "10:16"},
+        {"place_id": 373, "arrival": "10:23", "departure": "13:23"},
+        {"place_id": 689, "arrival": "13:31", "departure": "14:31"}
+      ]
+    }
+  ]
+}

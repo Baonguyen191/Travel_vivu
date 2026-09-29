@@ -244,6 +244,35 @@ commit):
 - `data/generated/` — file sinh ra dùng lại cho lần chạy sau (ví dụ
   `city_hue_boundary.wkt`).
 
+## Chatbot demo
+
+```powershell
+pip install -e ".[embed,demo,llm]"
+streamlit run demo/app.py
+```
+
+Cần database đang chạy và đã `python -m pipeline embed`.
+
+- LLM (agent tool-calling và nhận diện ảnh bằng vision LLM) qua API tương thích OpenAI. Mặc định
+  Ollama local, miễn phí:
+  ```powershell
+  winget install Ollama.Ollama
+  setx OLLAMA_CONTEXT_LENGTH 8192     # rồi khởi động lại Ollama
+  ollama pull qwen3.5:9b              # thiếu VRAM thì qwen3.5:4b
+  ```
+  và trong `.env`: `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_MODEL=qwen3.5:9b`. Dùng
+  OpenAI thì bỏ `OPENAI_BASE_URL`, đặt `OPENAI_API_KEY`. Không cấu hình gì thì demo chạy chế độ
+  luật (nhận ý định bằng từ khoá). So sánh model: `python scripts/llm_smoke_test.py --n 10` (model theo `OPENAI_MODEL`).
+- Thời gian đi và tuyến đường thật, miễn phí: dựng OSRM một lần rồi chạy service:
+  ```powershell
+  python scripts/setup_osrm.py                    # tải bản đồ OSM Việt Nam, xử lý ~20 phút, cần ~8 GB RAM Docker
+  docker compose --profile routing up -d osrm     # http://localhost:5100
+  ```
+  Dữ liệu nằm trong Docker volume `travel_osrm`, không nằm trong repo (repo ở OneDrive).
+- `GOOGLE_MAPS_API_KEY`: thời gian đi có giao thông từ Google Routes. Project phải bật Routes API
+  và billing. Không có OSRM lẫn Google thì thời gian đi là ước lượng. Kịch bản trình bày:
+[docs/demo/kich-ban-demo.md](docs/demo/kich-ban-demo.md).
+
 ## Chạy test
 
 ```bash

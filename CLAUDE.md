@@ -17,15 +17,15 @@ LLM agent điều phối + tools. LLM (có khả năng đọc ảnh) hiểu yêu
 | Thành phần | Lựa chọn |
 |---|---|
 | Backend | FastAPI (Python) |
-| Điều phối agent | Tool-calling trực tiếp qua API nhà cung cấp LLM |
+| Điều phối agent | Tool-calling qua API tương thích OpenAI Chat Completions (`agent/llm.py`). Mặc định Ollama local `qwen3.5:9b` (`OPENAI_BASE_URL=http://localhost:11434/v1`, `OLLAMA_CONTEXT_LENGTH=8192`), dự phòng `qwen3.5:4b`; OpenAI `gpt-5.4-mini` khi bỏ `OPENAI_BASE_URL` và có key; Gemini qua endpoint tương thích OpenAI cho baseline. Đổi bằng `OPENAI_BASE_URL` / `OPENAI_MODEL`; không có key lẫn server local thì chạy chế độ luật (`agent/nlu.py`). Chọn model bằng số liệu: `python scripts/llm_smoke_test.py` |
 | CSDL | PostgreSQL + PostGIS + pgvector |
 | Cache | Redis (dựng khi có backend API) |
 | Lưu file | `data/raw/` trên đĩa; chuyển sang MinIO khi có backend |
 | Tối ưu lịch | Google OR-Tools |
 | Thời tiết | Open-Meteo |
-| Chỉ đường | Nhúng Google Maps API (Routes / Distance Matrix API) kết hợp OSRM / Goong làm fallback; dẫn đường thực tế deep link sang app bản đồ |
+| Chỉ đường | OSRM tự host (mặc định, miễn phí, `maps/osrm.py`, dữ liệu OSM Việt Nam trong Docker volume `travel_osrm`); Google Routes (`maps/client.py`) khi cần giao thông và có billing; không có cả hai thì ước lượng. Chọn nguồn: `maps/routing.py`. Dẫn đường bằng deep link Maps URLs |
 
-Các dịch vụ mặc định dùng API miễn phí: Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Sử dụng **Google Maps API** cho riêng tính năng chỉ đường và ma trận giao thông/tắc đường real-time. Không dùng Google Places / Foursquare / LLM API thương mại khác để tối ưu chi phí.
+Các dịch vụ mặc định dùng API miễn phí: Wikidata, Wikipedia, Wikivoyage, OSM Overpass, Wikimedia Commons, Open-Meteo. Sử dụng **Google Maps API** cho riêng tính năng chỉ đường và ma trận giao thông/tắc đường real-time. Dùng **LLM qua API tương thích OpenAI** (mặc định Ollama local, miễn phí) cho agent (trích ràng buộc, diễn giải kết quả tool) và vision LLM ở tầng 3 nhận diện ảnh; mọi thông tin đúng/sai vẫn đến từ tool. Model phải có cả vision lẫn tools (qwen3.5 có; phần lớn vision model khác trên Ollama không nhận tools). Gọi Ollama `/v1` với `reasoning_effort="none"` để tắt thinking (`extra_body={"think": false}` không có tác dụng trên Ollama 0.17). Không dùng Google Places / Foursquare. Key đặt trong `.env` hoặc biến môi trường, không bao giờ commit.
 
 Python 3.14 trên máy phát triển. Tránh Scrapy (chưa chắc có wheel); dùng `httpx`, `selectolax`, `trafilatura`, `psycopg` v3.
 
@@ -44,7 +44,9 @@ Ba tầng, chạy từ rẻ đến đắt, chỉ lên tầng sau khi tầng trư
 
 1. GPS trong EXIF → truy vấn PostGIS bán kính ~200m.
 2. Embedding ảnh (CLIP/SigLIP) so với kho ảnh địa danh trong `place_images` (20–50 ảnh mỗi địa danh, nhiều góc chụp).
-3. Vision LLM dự phòng — LLM đoán sai nhiều với địa danh ít nổi tiếng.
+3. Vision LLM dự phòng — LLM đoán sai nhiều với địa danh ít nổi tiếng. Chỉ được chọn trong danh sách địa danh có trong DB, dưới ngưỡng tin cậy 0.5 thì trả "không xác định".
+
+GPS là vị trí người chụp, không phải vật được chụp (ảnh Cầu Trường Tiền chụp từ bờ sông có GPS cách tượng đài Phan Bội Châu 72 m). Có vision LLM thì GPS chỉ thu hẹp ứng viên trong 800 m để vision chọn; không có thì lấy điểm gần nhất trong 200 m. Tầng 2 (embedding ảnh) chưa làm. Cài đặt: `recognition/landmark.py`.
 
 ## Thời tiết trong bộ tối ưu
 
@@ -59,20 +61,21 @@ Cache dự báo theo lưới tọa độ làm tròn ~0.1 độ, không gọi API
 
 ## Tối ưu chỉ đường dựa trên thời tiết và độ tắc đường (Google Maps API)
 
-Nhúng Google Maps API (Routes API / Distance Matrix API) để tính toán tuyến đường và thời gian di chuyển thực tế, kết hợp giữa tình trạng giao thông thời gian thực và yếu tố thời tiết:
+Dùng Google Routes API (`computeRouteMatrix` cho ma trận, `computeRoutes` cho tuyến; Distance Matrix API cũ đã Legacy) để tính thời gian đi thực tế, kết hợp giao thông và thời tiết. Cài đặt ở `maps/client.py`, `maps/flood.py`, `planner/matrix.py`, `planner/routes.py`, `planner/service.py`:
 
 1. **Dữ liệu giao thông thời gian thực (Real-time Traffic):**
-   - Trích xuất `duration_in_traffic` và mức độ ùn tắc từ Google Maps API theo đúng khung giờ dự kiến di chuyển trong ngày (bao gồm giờ cao điểm).
+   - Lấy `duration` (có giao thông) và `staticDuration` (không giao thông) tại các mốc `traffic_hours` (mặc định 8h, 12h, 17h) của từng ngày; solver dùng mốc gần giờ đến nhất. Routes API chỉ nhận giờ khởi hành trong tương lai.
    - Cập nhật ma trận thời gian di chuyển (Travel Time Matrix) làm đầu vào chính xác cho thuật toán tối ưu lịch trình (OR-Tools VRP) thay vì dùng khoảng cách địa lý đơn thuần.
 
 2. **Tối ưu chỉ đường thích ứng Thời tiết (Weather-aware Routing):**
-   - **Hệ số phạt thời gian di chuyển (Travel Time Penalty Factor):** Khi Open-Meteo dự báo mưa lớn, ngập lụt, sương mù hoặc tầm nhìn kém, thời gian di chuyển thực tế được nhân thêm hệ số điều chỉnh (ví dụ: $1.2\times - 1.5\times$) để phản ánh tốc độ lưu thông giảm.
-   - **Né tránh tuyến đường rủi ro (Safe Routing):** Tự động phát hiện và loại bỏ/giảm ưu tiên các tuyến đường dễ ngập lụt, đường ven sông Hương, hoặc ngõ ngách hẹp khi có cảnh báo mưa lớn/bão.
-   - **Gợi ý phương tiện & lộ trình thay thế:** Đề xuất lộ trình an toàn hơn (ví dụ: chọn đường lớn ít ngập thay vì tuyến ngắn nhất qua ngõ) hoặc điều chỉnh khuyến nghị phương tiện di chuyển (ô tô/taxi thay cho xe máy).
+   - **Hệ số phạt thời gian di chuyển:** `planner.rules.travel_factor`: mưa ×1.2, mưa lớn ×1.4, bão ×1.8.
+   - **Né tuyến rủi ro:** khi dự báo mưa lớn/bão, đoạn đi qua vùng trong `config/flood_zones.yml` bị phạt trong hàm mục tiêu, và `attach_routes` xin tuyến thay thế không qua vùng đó. **Chưa có dữ liệu vùng ngập:** OSM không có đường nào ở Huế gắn `flood_prone`; chỉ thêm vùng có nguồn kiểm chứng được.
+   - **Gợi ý phương tiện:** chặng đi xe máy lúc dự báo mưa lớn/bão có `travel_advice` khuyên đi taxi/ô tô kèm link dẫn đường ô tô.
 
 3. **Tích hợp thuật toán & Trải nghiệm người dùng:**
    - **Hàm mục tiêu tổng hợp:** $\text{Cost}(i, j) = \text{Google\_Traffic\_Duration}(i, j) \times \text{Weather\_Penalty} + \text{Risk\_Penalty}$.
-   - **Deep link & Dẫn đường:** Hiển thị trực quan tuyến đường trên bản đồ giao diện ứng dụng, đồng thời cung cấp deep link mở ứng dụng Google Maps để người dùng sử dụng tính năng dẫn đường turn-by-turn.
+   - **Deep link & Dẫn đường:** mỗi chặng có link `dir_action=navigate`; mỗi ngày có link đủ các điểm (chia link khi quá 9 waypoint). `attach_routes` điền encoded polyline để giao diện vẽ tuyến.
+   - **Chi phí:** ma trận tính phí theo phần tử; `TRAFFIC_AWARE` là SKU Pro, `TWO_WHEELER` là SKU Enterprise nên xe máy mặc định dùng `DRIVE`. Mỗi client có trần `max_billable_elements`. Không lưu kết quả Google ra đĩa (điều khoản hạn chế lưu nội dung); thực nghiệm hàng loạt dùng ước lượng.
 
 ## Dữ liệu
 
@@ -106,8 +109,8 @@ Mỗi tính năng phải có chỉ số và baseline, thiết kế trước khi 
 | Nhận diện địa danh | Top-1 / Top-5 trên tập ảnh test tự chụp | LLM thuần |
 | Truy hồi RAG (hybrid: bge-m3 + BM25 giữ dấu/bỏ dấu/bigram, RRF; loại category không phải điểm đến) | Hit@k, MRR, nDCG@5, Precision@5, AnswerHit@5 trên `eval/rag_queries.yml` (`python -m rag.benchmark`) | Dense, BM25, random |
 | Hỏi đáp | Tỷ lệ thông tin sai / bịa | Không có RAG |
-| Lập lịch | Tỷ lệ lịch khả thi (đúng giờ mở cửa, trong ngân sách, di chuyển kịp) | LLM tự lập lịch |
-| Thời tiết | Sinh lịch trên thời tiết lịch sử, đối chiếu thời tiết thực tế: số giờ ngoài trời khi mưa, số hoạt động bị hủy do bão | Bộ lập lịch không có tính năng thời tiết |
+| Lập lịch | Tỷ lệ lịch khả thi (đúng giờ mở cửa, trong ngân sách, di chuyển kịp), `planner/feasibility.py` | LLM tự lập lịch (`python -m planner.experiment llm-prompt` / `llm-score`) |
+| Thời tiết | Sinh lịch trên dự báo lịch sử (Open-Meteo Previous Runs), đối chiếu thời tiết thực tế (ERA5): số giờ ngoài trời khi mưa, số hoạt động bị hủy do bão (`python -m planner.experiment run`) | Bộ lập lịch không có tính năng thời tiết; oracle biết trước thời tiết làm cận trên |
 | Chỉ đường & giao thông | Thời gian di chuyển thực tế, tỷ lệ né tránh thành công điểm tắc đường/ngập lụt | chỉ đường static (OSRM/Goong không tính thời tiết & tắc đường real-time) |
 | Review | Precision / Recall / F1 theo khía cạnh | — |
 
@@ -116,3 +119,11 @@ Khi thêm một tính năng, thêm cả cách đo nó. Tính năng không đo đ
 ## Tiến độ
 
 12 tuần: dữ liệu (1–3), nhận diện + RAG (4–5), lập lịch + thời tiết (6–8), chỉ đường (9), thực nghiệm và báo cáo (10–12). Đóng băng tính năng sau tuần 8; từ đó chỉ sửa lỗi, chạy thực nghiệm, viết báo cáo.
+
+- **Đã hoàn thành:**
+  - Data Pipeline (Crawl, normalize, PostGIS/pgvector storage).
+  - Hybrid RAG (BAAI/bge-m3 + BM25 multi/fold + RRF fusion + benchmark engine).
+  - Bộ lập lịch thích ứng thời tiết (`planner/`, thiết kế: docs/superpowers/specs/2026-09-27-weather-aware-schedule-optimizer-design.md): VRPTW nhiều ngày, bản sao theo khung giờ, ràng buộc cứng theo `unsafe_conditions`, tầng thời tiết theo khoảng cách tới ngày đi, thực nghiệm trên thời tiết lịch sử (data/qa/planner_experiment_2026-09-27.md).
+- **Baseline LLM tự lập lịch** (`python -m planner.experiment llm-collect` rồi `run --llm-dir`, lịch cache ở `eval/llm_schedules/`): `gpt-5.4-mini` đã chạy đủ 1 ngày (`none`, `medium`) và 2 ngày (`none`); 2 ngày `medium` mới 17/122 lịch (hết credit OpenAI). Kết quả: data/qa/planner_experiment_2026-09-29_osrm_llm_*.md. Baseline trên model local/Gemini chạy cùng lệnh với `--base-url`.
+- **Còn thiếu:** giờ mở cửa (9/208 điểm tham quan) và giá vé (1 điểm) trong DB; kiểm định chuyến 2 ngày. Kết quả chính dùng thời gian đi OSRM (data/qa/planner_experiment_2026-09-27_osrm.md): 1 ngày giảm 14% giờ ngoài trời khi mưa (oracle 38%), 2 ngày giảm 11% (oracle 35%); với thời gian đi ước lượng là 38% (oracle 59%). Mức giảm nhạy với việc lịch baseline tình cờ trùng giờ mưa: nên thêm baseline lấy trung bình nhiều thứ tự ngẫu nhiên để số liệu ổn định hơn.
+

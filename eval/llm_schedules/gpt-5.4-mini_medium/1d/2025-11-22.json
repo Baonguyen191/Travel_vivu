@@ -1,0 +1,44 @@
+{
+  "days": [
+    {
+      "date": "2025-11-22",
+      "visits": [
+        {
+          "place_id": 884,
+          "arrival": "08:05",
+          "departure": "09:05"
+        },
+        {
+          "place_id": 604,
+          "arrival": "09:10",
+          "departure": "10:10"
+        },
+        {
+          "place_id": 689,
+          "arrival": "10:15",
+          "departure": "11:15"
+        },
+        {
+          "place_id": 590,
+          "arrival": "11:25",
+          "departure": "12:55"
+        },
+        {
+          "place_id": 705,
+          "arrival": "13:05",
+          "departure": "14:05"
+        },
+        {
+          "place_id": 577,
+          "arrival": "14:15",
+          "departure": "15:30"
+        },
+        {
+          "place_id": 898,
+          "arrival": "15:45",
+          "departure": "17:00"
+        }
+      ]
+    }
+  ]
+}
