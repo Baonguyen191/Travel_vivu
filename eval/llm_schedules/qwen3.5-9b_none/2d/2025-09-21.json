@@ -1,0 +1,69 @@
+Chào bạn, với tư cách là trợ lý du lịch Huế của bạn, tôi đã lên lịch trình chi tiết dựa trên các ràng buộc về điều kiện thời tiết, an toàn và thời gian bạn cung cấp.
+
+**Phân tích dữ liệu thời tiết và an toàn:**
+*   **Ngày 21/09/2025:** Có hiện tượng nguy hiểm `bao` (bão/dông) trong khoảng 14:00 - 17:00. Thời gian di chuyển giữa các điểm dự kiến sẽ cần khoảng 15-20 phút. Lịch trình nên kết thúc trước hoặc ngay sau cơn bão dự kiến, ưu tiên đi trong nhà hoặc tránh ra ngoài khi trời mưa.
+*   **Ngày 22/09/2025:** Có hiện tượng `bao` vào khoảng 13:00 - 18:00. Khách sạn ở tọa độ (16.4637, 107.5909) rất gần Cầu Trường Tiền và Bảo tàng Mỹ thuật Cung đình.
+*   **Lựa chọn địa điểm:** Ưu tiên các điểm có tỷ lệ trong nhà cao hoặc cách xa các điểm ghi nhận nguy hiểm `mua_lon` khi thời tiết xấu. Bạn đã yêu cầu đi nhiều điểm nhất có thể.
+
+**Lịch trình đề xuất:**
+*   **Ngày 1 (Chủ Nhật, 21/09):** Bắt đầu từ Khách sạn -> Chợ Đông Ba (vừa đi vừa mua sắm) -> Hoàng thành Huế (vào trong lâu 3 tiếng) -> Lăng Tự Đức -> Lăng Khải Định (trên đường về khách sạn). Kết thúc trước khi cơn bão mạnh lên.
+*   **Ngày 2 (Thứ Hai, 22/09):** Tránh khu vực ven sông khi có gió mạnh. Đi Lăng Minh Mạng, Bảo tàng Mỹ thuật Cung đình (trong nhà), Cầu Trường Tiền (ngắn gọn), Lăng Tự Đức, Chùa Thiên Mụ (nên đi khi còn sáng).
+
+Dưới đây là định dạng JSON theo yêu cầu:
+
+```json
+{
+  "days": [
+    {
+      "date": "2025-09-21",
+      "visits": [
+        {
+          "place_id": 604,
+          "arrival": "08:15",
+          "departure": "09:15"
+        },
+        {
+          "place_id": 373,
+          "arrival": "09:45",
+          "departure": "12:45"
+        },
+        {
+          "place_id": 577,
+          "arrival": "13:00",
+          "departure": "14:15"
+        },
+        {
+          "place_id": 898,
+          "arrival": "14:30",
+          "departure": "15:45"
+        }
+      ]
+    },
+    {
+      "date": "2025-09-22",
+      "visits": [
+        {
+          "place_id": 578,
+          "arrival": "08:15",
+          "departure": "09:30"
+        },
+        {
+          "place_id": 884,
+          "arrival": "10:00",
+          "departure": "11:00"
+        },
+        {
+          "place_id": 689,
+          "arrival": "11:15",
+          "departure": "12:15"
+        },
+        {
+          "place_id": 577,
+          "arrival": "12:30",
+          "departure": "13:45"
+        }
+      ]
+    }
+  ]
+}
+```

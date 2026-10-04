@@ -61,6 +61,31 @@ def test_load_cached_forecast_respects_age(db_conn):
     assert load_cached_forecast(db_conn, (16.5, 107.6), now + timedelta(hours=10)) is None
 
 
+@pytest.mark.integration
+def test_trip_weather_writes_live_forecast_to_cache(db_conn):
+    from planner.weather import trip_weather
+
+    # Ngày thật: `fetched_at` là now() của DB, so với `now` để xét cache còn mới.
+    today = date.today()
+    calls = []
+
+    def fetch(url, params, fresh):
+        calls.append(url)
+        return _payload(today, today + timedelta(days=2), "", rain_hours={9})
+
+    hotel = (16.4637, 107.5909)
+    first = trip_weather([hotel], [today + timedelta(days=1)], today, conn=db_conn, fetch_json=fetch,
+                         now=datetime.now())
+    second = trip_weather([hotel], [today + timedelta(days=1)], today, conn=db_conn, fetch_json=fetch,
+                          now=datetime.now())
+    assert len(calls) == 1  # lần hai đọc cache trong DB, không gọi lại API
+    at_9 = datetime.combine(today + timedelta(days=1), time(9))
+    assert first.observed_at(*hotel, at_9).precipitation_mm == second.observed_at(*hotel, at_9).precipitation_mm == 6.0
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT count(*) FROM weather_cache WHERE fetched_at IS NOT NULL")
+        assert cur.fetchone()[0] == 3 * 24
+
+
 def _payload(start: date, end: date, suffix: str, rain_hours: set[int]) -> dict:
     hours = []
     t = datetime.combine(start, time())

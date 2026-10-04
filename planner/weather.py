@@ -297,6 +297,22 @@ def load_cached_forecast(conn, grid: Grid, now: datetime,
     ]
 
 
+def store_forecast(conn, grid: Grid, records: list[HourlyWeather]) -> int:
+    """Ghi dự báo vừa gọi trực tiếp vào `weather_cache` để các lần lập lịch sau
+    trong CACHE_MAX_AGE đọc từ DB thay vì gọi lại API. Lỗi ghi không làm hỏng
+    lần lập lịch hiện tại: dự báo đã có trong bộ nhớ."""
+    from pipeline.ingest.weather import upsert_forecast
+
+    rows = [{"forecast_time": r.time.replace(tzinfo=LOCAL_TZ), "temperature": r.temperature_c,
+             "precip_prob": r.rain_probability, "precip_mm": r.precipitation_mm,
+             "wind_speed": r.wind_speed_kmh, "weather_code": r.weather_code} for r in records]
+    try:
+        return upsert_forecast(conn, grid[0], grid[1], rows)
+    except Exception as exc:  # noqa: BLE001 - cache là phụ, không chặn việc lập lịch
+        print(f"weather: không ghi được cache ô {grid}: {exc}")
+        return 0
+
+
 def load_climate(conn, grid: Grid) -> list[ClimateNormal]:
     with conn.cursor() as cur:
         cur.execute(
@@ -349,6 +365,8 @@ def trip_weather(locations: Iterable[tuple[float, float]], days: Iterable[date],
                 except (httpx.HTTPError, ValueError, KeyError) as exc:
                     failed.append(f"{grid}: {exc}")
                     continue
+                if conn is not None:
+                    store_forecast(conn, grid, records)
             weather.add_hourly(grid, records)
 
     for grid in grids:

@@ -101,14 +101,16 @@ def run_place_facts(ctx: AgentContext, place_names: list[str]) -> dict:
             cur.execute("SELECT opening_hours_raw, ticket_price, dress_code, updated_at, source_url"
                         " FROM places WHERE id = %s", (p.id,))
             raw, ticket, dress, updated, source = cur.fetchone()
-            vnd = ticket.get("vnd") if isinstance(ticket, dict) else None
+            ticket = ticket if isinstance(ticket, dict) else {}
             facts.append({
                 "place": p.name,
                 "opening_hours": format_opening_hours(p.opening_hours, raw) or None,
-                "ticket_price_vnd": vnd,
+                "ticket_price_vnd": ticket.get("vnd"),
+                "ticket_price_vnd_max": ticket.get("vnd_max"),  # có thì giá là một khoảng
                 "dress_code": dress,
-                "updated_at": updated.date().isoformat() if updated else None,
-                "source_url": source,
+                # Giờ mở cửa và giá vé nhập từ config/place_facts.csv mang nguồn riêng.
+                "updated_at": ticket.get("checked_on") or (updated.date().isoformat() if updated else None),
+                "source_url": ticket.get("source_url") or source,
             })
     return {"places": facts, "not_found": missing,
             "note": "Trường null nghĩa là CSDL chưa có dữ liệu; không được đoán."}

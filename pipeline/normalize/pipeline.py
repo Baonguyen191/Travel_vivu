@@ -9,6 +9,7 @@ from pipeline.models import PlaceRecord
 from pipeline.normalize.category import load_category_rules, map_category
 from pipeline.normalize.merge import merge_places, within_core
 from pipeline.normalize.opening_hours import parse_opening_hours
+from pipeline.normalize.place_facts import apply_place_facts, load_place_facts
 from pipeline.normalize.weather_labels import (
     apply_labels, load_overrides, load_weather_defaults, warn_unmatched_overrides,
 )
@@ -46,21 +47,26 @@ def run(conn, cfg) -> tuple[list[PlaceRecord], list[dict], int]:
     rules = load_category_rules()
     defaults = load_weather_defaults()
     overrides = load_overrides()
+    facts = load_place_facts()
 
     result = []
     dropped = 0
     matched_override_keys: set[str] = set()
+    matched_fact_keys: set[str] = set()
     for place in places:
         place.category = map_category(place.tags, place.wikidata_classes, rules)
         if place.category == ADMIN_CATEGORY:
             dropped += 1
             continue
         place.opening_hours = parse_opening_hours(place.opening_hours_raw)
-        result.append(apply_labels(place, defaults, overrides, matched_override_keys))
+        labeled = apply_labels(place, defaults, overrides, matched_override_keys)
+        result.append(apply_place_facts(labeled, facts, matched_fact_keys))
 
     if dropped:
         print(f"normalize: bỏ qua {dropped} đơn vị hành chính")
     warn_unmatched_overrides(overrides, matched_override_keys)
+    if unmatched := sorted(set(facts) - matched_fact_keys):
+        print(f"Cảnh báo: các khoá sau trong config/place_facts.csv không khớp place nào: {', '.join(unmatched)}")
 
     review_path = _dated_review_path(MERGE_REVIEW_PATH)
     review_path.parent.mkdir(parents=True, exist_ok=True)

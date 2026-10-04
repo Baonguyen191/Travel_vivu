@@ -76,9 +76,13 @@ Chỉ trả về JSON đúng định dạng sau, không kèm giải thích:
 
 
 def schedule_from_json(data: dict | str, places: dict[int | str, Place]) -> ScheduleResult:
-    """Đọc lịch dạng JSON (định dạng JSON_FORMAT). place_id lạ vẫn giữ để bộ kiểm tra báo lỗi."""
+    """Đọc lịch dạng JSON (định dạng JSON_FORMAT). place_id lạ vẫn giữ để bộ kiểm tra báo lỗi.
+
+    Model local (qwen3.5 qua Ollama) hay bọc JSON trong khối ```json dù đã bật
+    json_mode: lấy phần từ `{` đầu tiên tới `}` cuối cùng trước khi parse."""
     if isinstance(data, str):
-        data = json.loads(data)
+        start, end = data.find("{"), data.rfind("}")
+        data = json.loads(data[start:end + 1] if start != -1 and end > start else data)
     result = ScheduleResult(solver_status="llm")
     for day_data in data.get("days", []):
         day = date.fromisoformat(day_data["date"])

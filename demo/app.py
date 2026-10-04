@@ -296,8 +296,14 @@ def rules_reply(question: str, ctx: AgentContext) -> str:
             if any(w in t for w in ("mo cua", "may gio", "dong cua")):
                 parts.append(f"giờ mở cửa: {f['opening_hours'] or '**CSDL chưa có**'}")
             if any(w in t for w in ("gia ve", "ve vao", "bao nhieu tien")):
-                vnd = f["ticket_price_vnd"]
-                parts.append(f"giá vé: {vnd:,} đ".replace(",", ".") if vnd else "giá vé: **CSDL chưa có**")
+                vnd, vnd_max = f["ticket_price_vnd"], f["ticket_price_vnd_max"]
+                if vnd is None:
+                    parts.append("giá vé: **CSDL chưa có**")
+                elif vnd == 0 and not vnd_max:
+                    parts.append("giá vé: miễn phí")
+                else:
+                    price = f"{vnd:,}" + (f"–{vnd_max:,}" if vnd_max else "")
+                    parts.append(f"giá vé: {price} đ".replace(",", "."))
             lines.append(f"**{f['place']}** — " + "; ".join(parts) + f" _(cập nhật {f['updated_at']})_")
         return "\n\n".join(lines) + "\n\n_Đọc từ CSDL; thiếu thì báo thiếu, không đoán._"
     if intent == "weather":

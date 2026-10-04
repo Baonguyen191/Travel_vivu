@@ -340,3 +340,11 @@ def test_llm_prompt_and_json_round_trip():
     assert [v.place_id for v in result.visits] == ["lang", "ghost"]
     report = check_feasibility(result, places, constraint())
     assert report.count("unknown_place") == 1
+
+
+def test_schedule_from_json_accepts_markdown_fenced_json():
+    fenced = ('```json\n{"days": [{"date": "2026-10-10", "visits": [{"place_id": "lang", "arrival": "08:30",'
+              ' "departure": "10:00"}]}]}\n```')
+    assert [v.place_id for v in schedule_from_json(fenced, {LANG.id: LANG}).visits] == ["lang"]
+    with pytest.raises(ValueError):  # không có JSON nào vẫn là lỗi, tính là lịch sai định dạng
+        schedule_from_json("Xin lỗi, tôi không lập được lịch.", {})

@@ -1,0 +1,31 @@
+```json
+{
+  "days": [
+    {
+      "date": "2025-11-16",
+      "visits": [
+        {
+          "place_id": 884,
+          "arrival": "08:20",
+          "departure": "09:20"
+        },
+        {
+          "place_id": 373,
+          "arrival": "09:45",
+          "departure": "12:15"
+        },
+        {
+          "place_id": 577,
+          "arrival": "12:45",
+          "departure": "13:45"
+        },
+        {
+          "place_id": 689,
+          "arrival": "14:10",
+          "departure": "15:10"
+        }
+      ]
+    }
+  ]
+}
+```

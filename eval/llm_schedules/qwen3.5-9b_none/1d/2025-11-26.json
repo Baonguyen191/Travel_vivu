@@ -1,0 +1,19 @@
+```json
+{
+  "days": [
+    {
+      "date": "2025-11-26",
+      "visits": [
+        {"place_id": 884, "arrival": "08:00", "departure": "09:00"},
+        {"place_id": 604, "arrival": "09:20", "departure": "10:10"},
+        {"place_id": 689, "arrival": "10:20", "departure": "11:00"},
+        {"place_id": 373, "arrival": "11:20", "departure": "14:20"},
+        {"place_id": 901, "arrival": "14:30", "departure": "15:00"},
+        {"place_id": 577, "arrival": "15:20", "departure": "16:10"},
+        {"place_id": 590, "arrival": "16:30", "departure": "17:20"},
+        {"place_id": 898, "arrival": "17:40", "departure": "17:40"}
+      ]
+    }
+  ]
+}
+```

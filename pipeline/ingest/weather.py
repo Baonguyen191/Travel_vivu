@@ -106,6 +106,33 @@ def parse_normals(payload: dict) -> list[dict]:
     return rows
 
 
+UPSERT_FORECAST_SQL = (
+    "INSERT INTO weather_cache (lat_grid, lon_grid, forecast_time,"
+    " temperature, precip_prob, precip_mm, wind_speed, uv_index,"
+    " weather_code, fetched_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,now())"
+    " ON CONFLICT (lat_grid, lon_grid, forecast_time) DO UPDATE SET"
+    " temperature = EXCLUDED.temperature,"
+    " precip_prob = EXCLUDED.precip_prob,"
+    " precip_mm = EXCLUDED.precip_mm,"
+    " wind_speed = EXCLUDED.wind_speed,"
+    # Bộ lập lịch không lấy UV: lần ghi của nó không được xoá UV mà ingest đã có.
+    " uv_index = COALESCE(EXCLUDED.uv_index, weather_cache.uv_index),"
+    " weather_code = EXCLUDED.weather_code, fetched_at = now()"
+)
+
+
+def upsert_forecast(conn, lat: float, lon: float, rows: list[dict]) -> int:
+    """Ghi dự báo theo giờ của một ô lưới vào `weather_cache` (dạng dòng của
+    `parse_forecast`; `forecast_time` là chuỗi ISO có múi giờ hoặc datetime có tz).
+    Dùng chung cho `ingest weather` và bộ lập lịch khi gọi Open-Meteo trực tiếp."""
+    with conn.cursor() as cur:
+        cur.executemany(UPSERT_FORECAST_SQL, [
+            (lat, lon, row["forecast_time"], row.get("temperature"), row.get("precip_prob"),
+             row.get("precip_mm"), row.get("wind_speed"), row.get("uv_index"), row.get("weather_code"))
+            for row in rows])
+    return len(rows)
+
+
 def run(conn, cfg: CityConfig, force: bool = False) -> int:
     fetcher = Fetcher(conn, "open_meteo", min_interval=MIN_INTERVAL)
     written = 0
@@ -130,24 +157,7 @@ def run(conn, cfg: CityConfig, force: bool = False) -> int:
         except httpx.TimeoutException:
             print(f"weather: bỏ qua dự báo ô lưới ({lat}, {lon}) — timeout")
         else:
-            for row in parse_forecast(json.loads(forecast.content)):
-                with conn.cursor() as cur:
-                    cur.execute(
-                        "INSERT INTO weather_cache (lat_grid, lon_grid, forecast_time,"
-                        " temperature, precip_prob, precip_mm, wind_speed, uv_index,"
-                        " weather_code, fetched_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,now())"
-                        " ON CONFLICT (lat_grid, lon_grid, forecast_time) DO UPDATE SET"
-                        " temperature = EXCLUDED.temperature,"
-                        " precip_prob = EXCLUDED.precip_prob,"
-                        " precip_mm = EXCLUDED.precip_mm,"
-                        " wind_speed = EXCLUDED.wind_speed,"
-                        " uv_index = EXCLUDED.uv_index,"
-                        " weather_code = EXCLUDED.weather_code, fetched_at = now()",
-                        (lat, lon, row["forecast_time"], row["temperature"],
-                         row["precip_prob"], row["precip_mm"], row["wind_speed"],
-                         row["uv_index"], row["weather_code"]),
-                    )
-                    written += 1
+            written += upsert_forecast(conn, lat, lon, parse_forecast(json.loads(forecast.content)))
 
         try:
             archive = fetcher.fetch(

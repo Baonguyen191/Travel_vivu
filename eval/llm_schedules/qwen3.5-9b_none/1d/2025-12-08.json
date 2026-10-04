@@ -1,0 +1,41 @@
+```json
+{
+  "days": [
+    {
+      "date": "2025-12-08",
+      "visits": [
+        {
+          "place_id": 884,
+          "arrival": "08:30",
+          "departure": "09:30"
+        },
+        {
+          "place_id": 577,
+          "arrival": "09:45",
+          "departure": "10:00"
+        },
+        {
+          "place_id": 373,
+          "arrival": "10:30",
+          "departure": "12:30"
+        },
+        {
+          "place_id": 901,
+          "arrival": "13:15",
+          "departure": "14:00"
+        },
+        {
+          "place_id": 578,
+          "arrival": "14:20",
+          "departure": "15:05"
+        },
+        {
+          "place_id": 898,
+          "arrival": "15:30",
+          "departure": "16:45"
+        }
+      ]
+    }
+  ]
+}
+```
