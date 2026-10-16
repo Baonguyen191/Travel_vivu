@@ -1,0 +1,31 @@
+# Dữ liệu thô và kết quả QA — sinh lại được bằng pipeline
+data/
+
+# Bí mật
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Hệ điều hành / IDE
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Scratch của quy trình subagent-driven development
+.superpowers/
+
+# Build artifact của pip install -e .
+*.egg-info/
+
+frontend/node_modules/
+frontend/dist/
+frontend/src/assets/
