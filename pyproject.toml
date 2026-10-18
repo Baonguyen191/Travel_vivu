@@ -1,0 +1,27 @@
+[project]
+name = "travel-agent-hue"
+version = "0.2.0"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy>=2",
+  "pandas>=2",
+  "pyyaml>=6",
+  "pillow>=11",
+]
+
+[project.optional-dependencies]
+rag = [
+  "sentence-transformers>=5",
+  "openai>=1.40",
+]
+notebook = [
+  "matplotlib>=3.9",
+  "nbformat>=5.10",
+  "nbclient>=0.10",
+  "ipykernel>=6.29",
+]
+dev = ["pytest>=8.3"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
