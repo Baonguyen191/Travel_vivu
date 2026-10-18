@@ -1,0 +1,1832 @@
+# Bộ câu hỏi gán nhãn tay cho benchmark truy hồi RAG (python -m rag.benchmark).
+#
+# Bản đầu do Claude soạn từ kiến thức chung về Huế, QID lấy từ
+# data/staged/wikidata.json. Mọi câu đang `reviewed: false`: người làm đồ án
+# kiểm lại nhãn (địa danh đúng, từ khoá có thật trong bài Wikipedia) rồi mới
+# đổi thành true. Báo cáo benchmark cảnh báo khi còn câu chưa kiểm duyệt.
+#
+# Trường:
+#   id              duy nhất, không đổi khi sửa câu (kết quả cũ tham chiếu theo id)
+#   query           câu người dùng thật có thể hỏi
+#   type            fact          hỏi một chi tiết, thường có answer_keywords
+#                   descriptive   hỏi chung về một địa danh, có nêu tên
+#                   paraphrase    mô tả địa danh mà không nêu tên (BM25 khó)
+#                   multi         nhiều địa danh cùng đúng; đo thêm Recall@k
+#                   no_diacritics gõ không dấu, như người dùng thật hay gõ
+#   relevant        mọi địa danh mà chunk của nó được coi là đúng (qid bắt buộc,
+#                   name chỉ để người đọc)
+#   answer_keywords (tuỳ chọn) chunk đúng phải chứa đủ các chuỗi này, không phân
+#                   biệt hoa thường. Chỉ ghi chuỗi chắc chắn có trong bài Wikipedia.
+#   category        (tuỳ chọn) truyền vào filter category của retriever
+#   reviewed        true khi người đã kiểm nhãn
+#
+# Mục tiêu: 50–100 câu, mỗi loại ít nhất 8 câu. Viết thêm câu từ câu hỏi
+# thật của người dùng thử nếu có.
+
+- id: q001
+  query: Chùa Thiên Mụ được xây dựng vào năm nào?
+  type: fact
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  answer_keywords: ["1601"]
+  reviewed: true
+
+- id: q002
+  query: Tháp Phước Duyên ở chùa Thiên Mụ có mấy tầng?
+  type: fact
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  answer_keywords: ["7 tầng"]
+  reviewed: true
+
+- id: q003
+  query: Ngôi chùa cổ có tháp bảy tầng nằm trên đồi bên bờ sông Hương
+  type: paraphrase
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  reviewed: true
+
+- id: q004
+  query: Lăng vua Tự Đức còn có tên gọi khác là gì?
+  type: fact
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  answer_keywords: ["Khiêm Cung"]
+  reviewed: true
+
+- id: q005
+  query: Lăng của vị vua làm nhiều thơ, có hồ Lưu Khiêm và Xung Khiêm tạ
+  type: paraphrase
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  reviewed: true
+
+- id: q006
+  query: Lăng Khải Định còn gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q7818621, name: Lăng Khải Định}
+  answer_keywords: ["Ứng Lăng"]
+  reviewed: true
+
+- id: q007
+  query: Lăng vua nào được trang trí bằng mảnh sành sứ ghép, pha kiến trúc phương Tây
+  type: paraphrase
+  relevant:
+    - {qid: Q7818621, name: Lăng Khải Định}
+  reviewed: true
+
+- id: q008
+  query: Tên chính thức của lăng vua Minh Mạng
+  type: fact
+  relevant:
+    - {qid: Q7481070, name: Lăng Minh Mạng}
+  answer_keywords: ["Hiếu Lăng"]
+  reviewed: true
+
+- id: q009
+  query: Lăng Gia Long có tên gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q7818615, name: Lăng Gia Long}
+  answer_keywords: ["Thiên Thọ"]
+  reviewed: true
+
+- id: q010
+  query: Lăng Thiệu Trị còn được gọi là gì?
+  type: fact
+  relevant:
+    - {qid: Q16511573, name: Lăng Thiệu Trị}
+  answer_keywords: ["Xương Lăng"]
+  reviewed: true
+
+- id: q011
+  query: Lăng Đồng Khánh có tên chữ là gì?
+  type: fact
+  relevant:
+    - {qid: Q10788196, name: Lăng Đồng Khánh}
+  answer_keywords: ["Tư Lăng"]
+  reviewed: true
+
+- id: q012
+  query: Các lăng tẩm của vua triều Nguyễn ở Huế
+  type: multi
+  relevant:
+    - {qid: Q7818615, name: Lăng Gia Long}
+    - {qid: Q7481070, name: Lăng Minh Mạng}
+    - {qid: Q16511573, name: Lăng Thiệu Trị}
+    - {qid: Q7481171, name: Lăng Tự Đức}
+    - {qid: Q10788178, name: Lăng Dục Đức}
+    - {qid: Q49079720, name: Lăng Kiến Phúc}
+    - {qid: Q10788196, name: Lăng Đồng Khánh}
+    - {qid: Q7818621, name: Lăng Khải Định}
+  reviewed: true
+
+- id: q013
+  query: Cổng chính phía nam của Hoàng thành Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q7023311, name: Ngọ Môn}
+    - {qid: Q10769129, name: Hoàng thành Huế}
+  reviewed: true
+
+- id: q014
+  query: Nơi vua nhà Nguyễn thiết triều và tổ chức đại lễ trong Hoàng thành
+  type: paraphrase
+  relevant:
+    - {qid: Q6826745, name: Điện Thái Hòa}
+    - {qid: Q10769129, name: Hoàng thành Huế}
+  reviewed: true
+
+- id: q015
+  query: Chín cái đỉnh đồng đúc thời Minh Mạng đặt trước Thế Miếu
+  type: paraphrase
+  relevant:
+    - {qid: Q10752805, name: Cửu Đỉnh}
+    - {qid: Q3211275, name: Thế Tổ Miếu}
+  reviewed: true
+
+- id: q016
+  query: Bảo tàng Cổ vật Cung đình Huế đặt trong tòa điện nào?
+  type: fact
+  relevant:
+    - {qid: Q5929149, name: Bảo tàng Cổ vật Cung đình Huế}
+    - {qid: Q10840231, name: Điện Long An}
+  answer_keywords: ["Long An"]
+  reviewed: true
+
+- id: q017
+  query: Nơi vua nhà Nguyễn làm lễ tế trời đất
+  type: paraphrase
+  relevant:
+    - {qid: Q10840433, name: Đàn Nam Giao}
+  reviewed: true
+
+- id: q018
+  query: Cây cầu sắt bắc qua sông Hương xây thời Pháp thuộc, có sáu nhịp
+  type: paraphrase
+  relevant:
+    - {qid: Q10752407, name: Cầu Trường Tiền}
+  reviewed: true
+
+- id: q019
+  query: Giới thiệu về chợ Đông Ba
+  type: descriptive
+  relevant:
+    - {qid: Q97273263, name: Chợ Đông Ba}
+  reviewed: true
+
+- id: q020
+  query: Ngôi chùa ở Huế gắn với các thái giám triều Nguyễn
+  type: paraphrase
+  relevant:
+    - {qid: Q10748576, name: Chùa Từ Hiếu}
+  reviewed: true
+
+- id: q021
+  query: Chùa Từ Đàm có vai trò gì trong lịch sử Phật giáo Việt Nam?
+  type: descriptive
+  relevant:
+    - {qid: Q7850514, name: Chùa Từ Đàm}
+  reviewed: true
+
+- id: q022
+  query: Cung điện của vua Khải Định khi còn là thái tử, kiến trúc pha phương Tây
+  type: paraphrase
+  relevant:
+    - {qid: Q10751137, name: Cung An Định}
+  reviewed: true
+
+- id: q023
+  query: Nhà thờ chính tòa Phủ Cam được xây dựng như thế nào?
+  type: descriptive
+  relevant:
+    - {qid: Q28197251, name: Nhà thờ chính tòa Phủ Cam}
+  reviewed: true
+
+- id: q024
+  query: Nơi thờ Khổng Tử và dựng bia tiến sĩ triều Nguyễn ở Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q10833485, name: Văn miếu Huế}
+  reviewed: true
+
+- id: q025
+  query: Cửa biển nơi phá Tam Giang thông ra biển Đông
+  type: paraphrase
+  relevant:
+    - {qid: Q10752775, name: Cửa Thuận An}
+    - {qid: Q10825419, name: Thuận An}
+  reviewed: true
+
+- id: q026
+  query: Tòa thành bao quanh Hoàng thành Huế xây theo kiểu Vauban
+  type: paraphrase
+  relevant:
+    - {qid: Q877185, name: Kinh thành Huế}
+  reviewed: true
+
+- id: q027
+  query: Cây cầu có mái ngói cổ ở làng quê gần Huế
+  type: paraphrase
+  relevant:
+    - {qid: Q10752425, name: Cầu ngói Thanh Toàn}
+  reviewed: true
+
+- id: q028
+  query: Sông Hương bắt nguồn từ đâu?
+  type: descriptive
+  relevant:
+    - {qid: Q1515971, name: Sông Hương}
+  answer_keywords: ["Trường Sơn"]
+  reviewed: true
+
+- id: q029
+  query: Các ngôi chùa nổi tiếng ở Huế
+  type: multi
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+    - {qid: Q10748576, name: Chùa Từ Hiếu}
+    - {qid: Q7850514, name: Chùa Từ Đàm}
+    - {qid: Q7272817, name: Chùa Quốc Ân}
+    - {qid: Q5275217, name: Chùa Diệu Đế}
+  reviewed: true
+
+- id: q030
+  query: Các miếu thờ trong Hoàng thành Huế
+  type: multi
+  relevant:
+    - {qid: Q3211275, name: Thế Tổ Miếu}
+    - {qid: Q10825789, name: Thái Tổ Miếu}
+    - {qid: Q10828164, name: Triệu Tổ Miếu}
+  reviewed: true
+
+- id: q031
+  query: lang tu duc co gi dep
+  type: no_diacritics
+  relevant:
+    - {qid: Q7481171, name: Lăng Tự Đức}
+  reviewed: true
+
+- id: q032
+  query: chua thien mu xay nam nao
+  type: no_diacritics
+  relevant:
+    - {qid: Q975568, name: Chùa Thiên Mụ}
+  answer_keywords: ["1601"]
+  reviewed: true
+
+- id: q033
+  query: cau truong tien dai bao nhieu
+  type: no_diacritics
+  relevant:
+    - {qid: Q10752407, name: Cầu Trường Tiền}
+  answer_keywords: ["402,60"]
+  reviewed: true
+
+- id: q034
+  query: dai noi hue gom nhung cong trinh nao
+  type: no_diacritics
+  relevant:
+    - {qid: Q10769129, name: Hoàng thành Huế}
+    - {qid: Q2234243, name: Cố đô Huế}
+  reviewed: true
+
+# --- Bổ sung 18/10/2026: nháp do Claude soạn từ data/rag/chunks.jsonl, từ khoá đã kiểm có
+# nguyên văn trong `source_chunk`. Duyệt bằng `python scripts/review_rag_queries.py`. ---
+
+- id: q035
+  query: "Cuộc biểu tình Phật giáo ở Huế năm 1993 có bao nhiêu người tham gia?"
+  type: fact
+  relevant:
+    - {qid: Q126703743, name: "Biểu tình Phật giáo tại Huế 1993"}
+  answer_keywords: ["40.000"]
+  source_chunk: "19874807-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q036
+  query: "Cuộc biểu tình đông người nhất Việt Nam sau 1975, đòi thả trụ trì chùa Thiên Mụ"
+  type: paraphrase
+  relevant:
+    - {qid: Q126703743, name: "Biểu tình Phật giáo tại Huế 1993"}
+  answer_keywords: ["Thích Trí Tựu"]
+  source_chunk: "19874807-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q037
+  query: "Tòa nhà chính của Bảo tàng Cổ vật Cung đình Huế có bao nhiêu cây cột gỗ?"
+  type: fact
+  relevant:
+    - {qid: Q5929149, name: "Bảo tàng Cổ vật Cung đình Huế"}
+  answer_keywords: ["128"]
+  source_chunk: "3280466-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q038
+  query: "Bảo tàng trưng bày đồ vàng, sứ, pháp lam và trang phục hoàng thất nhà Nguyễn"
+  type: paraphrase
+  relevant:
+    - {qid: Q5929149, name: "Bảo tàng Cổ vật Cung đình Huế"}
+  source_chunk: "3280466-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q039
+  query: "Vùng Bắc Trung Bộ rộng bao nhiêu nghìn km²?"
+  type: fact
+  relevant:
+    - {qid: Q1022242, name: "Bắc Trung Bộ"}
+  answer_keywords: ["51,2"]
+  source_chunk: "4068-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q040
+  query: "Bắc Trung Bộ trải dài từ đâu đến đâu?"
+  type: descriptive
+  relevant:
+    - {qid: Q1022242, name: "Bắc Trung Bộ"}
+  answer_keywords: ["Thanh Hóa", "Đèo Hải Vân"]
+  source_chunk: "4068-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q041
+  query: "Bệnh viện Trung ương Huế được thành lập năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q5929137, name: "Bệnh viện Trung ương Huế"}
+  answer_keywords: ["1894"]
+  source_chunk: "87062-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q042
+  query: "Bệnh viện Tây y đầu tiên của Việt Nam nằm ở đường nào?"
+  type: paraphrase
+  relevant:
+    - {qid: Q5929137, name: "Bệnh viện Trung ương Huế"}
+  answer_keywords: ["Lê Lợi"]
+  source_chunk: "87062-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q043
+  query: "Chùa Diệu Đế nằm trên đường nào?"
+  type: fact
+  relevant:
+    - {qid: Q5275217, name: "Chùa Diệu Đế"}
+  answer_keywords: ["Bạch Đằng"]
+  source_chunk: "235114-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q044
+  query: "Vị vua nào ra đời tại phủ cũ nơi sau này xây chùa Diệu Đế?"
+  type: fact
+  relevant:
+    - {qid: Q5275217, name: "Chùa Diệu Đế"}
+  answer_keywords: ["Thiệu Trị"]
+  source_chunk: "235114-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q045
+  query: "Ai là tổ sư khai sơn chùa Quốc Ân?"
+  type: fact
+  relevant:
+    - {qid: Q7272817, name: "Chùa Quốc Ân"}
+  answer_keywords: ["Nguyên Thiều"]
+  source_chunk: "276166-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q046
+  query: "Tổ đình đầu tiên của phái thiền Lâm Tế truyền từ Trung Quốc sang ở Huế"
+  type: paraphrase
+  relevant:
+    - {qid: Q7272817, name: "Chùa Quốc Ân"}
+  source_chunk: "276166-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q047
+  query: "Chùa Thiên Mụ nằm trên đồi nào?"
+  type: fact
+  relevant:
+    - {qid: Q975568, name: "Chùa Thiên Mụ"}
+  answer_keywords: ["Hà Khê"]
+  source_chunk: "24101-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q048
+  query: "Trước khi chúa Nguyễn lập chùa Thiên Mụ, trên đồi có ngôi chùa của người nào?"
+  type: fact
+  relevant:
+    - {qid: Q975568, name: "Chùa Thiên Mụ"}
+  answer_keywords: ["Chăm"]
+  source_chunk: "24101-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q049
+  query: "Ai khai sơn chùa Từ Hiếu?"
+  type: fact
+  relevant:
+    - {qid: Q10748576, name: "Chùa Từ Hiếu"}
+  answer_keywords: ["Nhất Định"]
+  source_chunk: "136037-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q050
+  query: "Chùa Từ Hiếu được khai sơn năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q10748576, name: "Chùa Từ Hiếu"}
+  answer_keywords: ["1843"]
+  source_chunk: "136037-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q051
+  query: "Chùa Từ Đàm nằm ở số mấy đường Sư Liễu Quán?"
+  type: fact
+  relevant:
+    - {qid: Q7850514, name: "Chùa Từ Đàm"}
+  answer_keywords: ["số 1 đường Sư Liễu Quán"]
+  source_chunk: "1751592-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q052
+  query: "Tên ban đầu của chùa Từ Đàm là gì?"
+  type: fact
+  relevant:
+    - {qid: Q7850514, name: "Chùa Từ Đàm"}
+  answer_keywords: ["Ấn Tôn"]
+  source_chunk: "1751592-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q053
+  query: "Các chúa Nguyễn cai trị vùng đất nào?"
+  type: descriptive
+  relevant:
+    - {qid: Q2301908, name: "Chúa Nguyễn"}
+  answer_keywords: ["Đàng Trong"]
+  source_chunk: "5298-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q054
+  query: "Chúa Nguyễn Hoàng là con trai của ai?"
+  type: fact
+  relevant:
+    - {qid: Q2301908, name: "Chúa Nguyễn"}
+  answer_keywords: ["Nguyễn Kim"]
+  source_chunk: "5298-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q055
+  query: "Chợ Đông Ba nằm trên đường nào?"
+  type: fact
+  relevant:
+    - {qid: Q97273263, name: "Chợ Đông Ba"}
+  answer_keywords: ["Trần Hưng Đạo"]
+  source_chunk: "19356227-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q056
+  query: "Tổng diện tích chợ Đông Ba là bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q97273263, name: "Chợ Đông Ba"}
+  answer_keywords: ["47.614"]
+  source_chunk: "19356227-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q057
+  query: "Cung An Định là cung điện riêng của vua nào?"
+  type: fact
+  relevant:
+    - {qid: Q10751137, name: "Cung An Định"}
+  answer_keywords: ["Khải Định"]
+  source_chunk: "232316-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q058
+  query: "Cung An Định ở số mấy đường Phan Đình Phùng?"
+  type: fact
+  relevant:
+    - {qid: Q10751137, name: "Cung An Định"}
+  answer_keywords: ["179"]
+  source_chunk: "232316-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q059
+  query: "Nơi gia đình vua Bảo Đại chuyển ra ở sau lễ thoái vị năm 1945"
+  type: paraphrase
+  relevant:
+    - {qid: Q10751137, name: "Cung An Định"}
+  source_chunk: "232316-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q060
+  query: "Công viên nước Hồ Thủy Tiên đưa vào hoạt động năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q115525590, name: "Công viên nước Hồ Thủy Tiên"}
+  answer_keywords: ["2004"]
+  source_chunk: "19768020-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q061
+  query: "Công viên nước bị bỏ hoang nổi tiếng vì vẻ kinh dị sau khi báo Mỹ đăng bài"
+  type: paraphrase
+  relevant:
+    - {qid: Q115525590, name: "Công viên nước Hồ Thủy Tiên"}
+  source_chunk: "19768020-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q062
+  query: "Cầu Chợ Dinh có mấy nhịp?"
+  type: fact
+  relevant:
+    - {qid: Q10740293, name: "Cầu Chợ Dinh"}
+  answer_keywords: ["9 nhịp"]
+  source_chunk: "19513867-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q063
+  query: "Cầu Dã Viên khánh thành ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q10752420, name: "Cầu Dã Viên"}
+  answer_keywords: ["31 tháng 8 năm 2012"]
+  source_chunk: "1522126-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q064
+  query: "Lúc khởi công, cầu Dã Viên mang tên gì?"
+  type: fact
+  relevant:
+    - {qid: Q10752420, name: "Cầu Dã Viên"}
+  answer_keywords: ["Bạch Hổ"]
+  source_chunk: "1522126-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q065
+  query: "Cầu Hữu Trạch dài bao nhiêu mét?"
+  type: fact
+  relevant:
+    - {qid: Q124158901, name: "Cầu Hữu Trạch"}
+  answer_keywords: ["153 m"]
+  source_chunk: "19687050-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q066
+  query: "Cầu Nguyễn Hoàng thông xe kỹ thuật ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q32581061, name: "Cầu Nguyễn Hoàng"}
+  answer_keywords: ["26 tháng 3 năm 2025"]
+  source_chunk: "19654987-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q067
+  query: "Cây cầu mới qua sông Hương đặt theo tên Chúa Tiên"
+  type: paraphrase
+  relevant:
+    - {qid: Q32581061, name: "Cầu Nguyễn Hoàng"}
+  source_chunk: "19654987-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q068
+  query: "Cầu Phú Xuân dài bao nhiêu mét?"
+  type: fact
+  relevant:
+    - {qid: Q10752393, name: "Cầu Phú Xuân"}
+  answer_keywords: ["374,65"]
+  source_chunk: "435893-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q069
+  query: "Cầu Phú Xuân còn có tên gọi nào khác?"
+  type: descriptive
+  relevant:
+    - {qid: Q10752393, name: "Cầu Phú Xuân"}
+  answer_keywords: ["cầu Mới"]
+  source_chunk: "435893-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q070
+  query: "Cầu Tam Giang còn được gọi là cầu gì?"
+  type: fact
+  relevant:
+    - {qid: Q10740295, name: "Cầu Tam Giang"}
+  answer_keywords: ["Ca Cút"]
+  source_chunk: "19513878-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q071
+  query: "Cầu Thuận An mới được thông xe năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q16480564, name: "Cầu Thuận An"}
+  answer_keywords: ["2007"]
+  source_chunk: "19511774-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q072
+  query: "Cây cầu đầu tiên vượt phá Tam Giang"
+  type: paraphrase
+  relevant:
+    - {qid: Q16480564, name: "Cầu Thuận An"}
+  source_chunk: "19511774-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q073
+  query: "Hãng nào thiết kế cây cầu sắt Trường Tiền?"
+  type: fact
+  relevant:
+    - {qid: Q10752407, name: "Cầu Trường Tiền"}
+  answer_keywords: ["Schneider"]
+  source_chunk: "36349-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q074
+  query: "Cầu Trường Tiền có mấy nhịp?"
+  type: fact
+  relevant:
+    - {qid: Q10752407, name: "Cầu Trường Tiền"}
+  answer_keywords: ["6 nhịp"]
+  source_chunk: "36349-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q075
+  query: "Cầu Tuần được đưa vào sử dụng năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q31993740, name: "Cầu Tuần"}
+  answer_keywords: ["2003"]
+  source_chunk: "19511758-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q076
+  query: "Cầu ngói Thanh Toàn được xây theo lối kiến trúc gì?"
+  type: fact
+  relevant:
+    - {qid: Q10752425, name: "Cầu ngói Thanh Toàn"}
+  answer_keywords: ["thượng gia hạ kiều"]
+  source_chunk: "239673-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q077
+  query: "Huế kết thúc vai trò thủ đô Việt Nam vào năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q2234243, name: "Cố đô Huế"}
+  answer_keywords: ["1945"]
+  source_chunk: "52289-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q078
+  query: "Vua Chiêm nào cưới công chúa Huyền Trân, đổi lấy hai châu Ô và Lý?"
+  type: fact
+  relevant:
+    - {qid: Q2234243, name: "Cố đô Huế"}
+  answer_keywords: ["Chế Mân"]
+  source_chunk: "52289-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q079
+  query: "Theo phong thủy Kinh thành Huế, cồn Dã Viên đóng vai trò gì?"
+  type: fact
+  relevant:
+    - {qid: Q11840168, name: "Cồn Dã Viên"}
+  answer_keywords: ["hữu bạch hổ"]
+  source_chunk: "231611-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q080
+  query: "Năm 1750 chúa Nguyễn Phúc Khoát tổ chức sự kiện gì ở cồn Dã Viên?"
+  type: fact
+  relevant:
+    - {qid: Q11840168, name: "Cồn Dã Viên"}
+  answer_keywords: ["voi và cọp"]
+  source_chunk: "231611-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q081
+  query: "Cửa Thuận An cách thành phố Huế bao xa?"
+  type: fact
+  relevant:
+    - {qid: Q10752775, name: "Cửa Thuận An"}
+  answer_keywords: ["15 km"]
+  source_chunk: "647730-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q082
+  query: "Tên cũ của cửa Thuận An là gì?"
+  type: fact
+  relevant:
+    - {qid: Q10752775, name: "Cửa Thuận An"}
+  answer_keywords: ["cửa Eo"]
+  source_chunk: "647730-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q083
+  query: "Cửu Đỉnh được đặt trước sân miếu nào?"
+  type: fact
+  relevant:
+    - {qid: Q10752805, name: "Cửu Đỉnh (nhà Nguyễn)"}
+  answer_keywords: ["Thế miếu"]
+  source_chunk: "141105-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q084
+  query: "Cửu Đỉnh khánh thành ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q10752805, name: "Cửu Đỉnh (nhà Nguyễn)"}
+  answer_keywords: ["1 tháng 3 năm 1837"]
+  source_chunk: "141105-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q085
+  query: "Trạm An Cựu nằm giữa hai nhà ga nào?"
+  type: fact
+  relevant:
+    - {qid: Q130514609, name: "Ga An Cựu"}
+  answer_keywords: ["ga Huế và ga Hương Thủy"]
+  source_chunk: "19803982-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q086
+  query: "Ga Huế được xây năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q994118, name: "Ga Huế"}
+  answer_keywords: ["1908"]
+  source_chunk: "3704998-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q087
+  query: "Tên cũ của ga Huế là gì?"
+  type: fact
+  relevant:
+    - {qid: Q994118, name: "Ga Huế"}
+  answer_keywords: ["Ga Trường Súng"]
+  source_chunk: "3704998-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q088
+  query: "Vua nào bị đưa lên ga Huế để bắt đầu cuộc đày ải năm 1916?"
+  type: fact
+  relevant:
+    - {qid: Q994118, name: "Ga Huế"}
+  answer_keywords: ["Duy Tân"]
+  source_chunk: "3704998-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q089
+  query: "Ga Hương Thủy nằm ở phường nào?"
+  type: fact
+  relevant:
+    - {qid: Q60363499, name: "Ga Hương Thủy"}
+  answer_keywords: ["Phú Bài"]
+  source_chunk: "13674630-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q090
+  query: "Ga Văn Xá nằm sau ga nào trên đường sắt Bắc Nam?"
+  type: fact
+  relevant:
+    - {qid: Q60364455, name: "Ga Văn Xá"}
+  answer_keywords: ["Hiền Sỹ"]
+  source_chunk: "13674629-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q091
+  query: "Hoàng thành Huế có mấy cửa ra vào?"
+  type: fact
+  relevant:
+    - {qid: Q10769129, name: "Hoàng thành Huế"}
+  answer_keywords: ["4 cửa"]
+  source_chunk: "230007-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q092
+  query: "Cửa phía đông của Hoàng thành Huế tên là gì?"
+  type: fact
+  relevant:
+    - {qid: Q10769129, name: "Hoàng thành Huế"}
+  answer_keywords: ["Hiển Nhơn"]
+  source_chunk: "230007-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q093
+  query: "Đại Nội Huế có diện tích khoảng bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q10769129, name: "Hoàng thành Huế"}
+  answer_keywords: ["520ha"]
+  source_chunk: "230007-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q094
+  query: "Huế có bao nhiêu danh hiệu UNESCO?"
+  type: fact
+  relevant:
+    - {qid: Q36399, name: "Huế"}
+  answer_keywords: ["năm danh hiệu UNESCO"]
+  source_chunk: "11244-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q095
+  query: "Diện tích thành phố Huế sau sáp nhập năm 2025 là bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q36399, name: "Huế"}
+  answer_keywords: ["4.947"]
+  source_chunk: "11244-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q096
+  query: "Nhã nhạc cung đình Huế được UNESCO công nhận năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q36399, name: "Huế"}
+  answer_keywords: ["2003"]
+  source_chunk: "11244-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q097
+  query: "Thành phố Huế cũ cách Đà Nẵng bao nhiêu km?"
+  type: fact
+  relevant:
+    - {qid: Q36167, name: "Huế (thành phố thuộc tỉnh)"}
+  answer_keywords: ["95 km"]
+  source_chunk: "866-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q098
+  query: "Khách sạn Saigon Morin nằm ở địa chỉ nào?"
+  type: fact
+  relevant:
+    - {qid: Q106196496, name: "Khách sạn Saigon Morin"}
+  answer_keywords: ["30, đường Lê Lợi"]
+  source_chunk: "19567922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q099
+  query: "Khách sạn Morin ở Huế có từ năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q106196496, name: "Khách sạn Saigon Morin"}
+  answer_keywords: ["1901"]
+  source_chunk: "19567922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q100
+  query: "Khách sạn Saigon Morin có bao nhiêu phòng ngủ?"
+  type: fact
+  relevant:
+    - {qid: Q106196496, name: "Khách sạn Saigon Morin"}
+  answer_keywords: ["183"]
+  source_chunk: "19567922-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q101
+  query: "Kinh thành Huế khởi công xây dựng năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q877185, name: "Kinh thành Huế"}
+  answer_keywords: ["1805"]
+  source_chunk: "229895-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q102
+  query: "Nhà Nguyễn đóng đô ở Kinh thành Huế trong bao nhiêu năm?"
+  type: fact
+  relevant:
+    - {qid: Q877185, name: "Kinh thành Huế"}
+  answer_keywords: ["143 năm"]
+  source_chunk: "229895-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q103
+  query: "Tên chữ của lăng Dục Đức là gì?"
+  type: fact
+  relevant:
+    - {qid: Q10788178, name: "Lăng Dục Đức"}
+  answer_keywords: ["An Lăng"]
+  source_chunk: "214646-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q104
+  query: "Vua Dục Đức ở ngôi bao nhiêu ngày?"
+  type: fact
+  relevant:
+    - {qid: Q10788178, name: "Lăng Dục Đức"}
+  answer_keywords: ["3 ngày"]
+  source_chunk: "214646-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q105
+  query: "Lăng Gia Long được xây từ năm nào đến năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q7818615, name: "Lăng Gia Long"}
+  answer_keywords: ["1814", "1820"]
+  source_chunk: "216866-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q106
+  query: "Vua Khải Định lên ngôi năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q7818621, name: "Lăng Khải Định"}
+  answer_keywords: ["1916"]
+  source_chunk: "202284-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q107
+  query: "Vua Kiến Phúc trị vì được bao lâu?"
+  type: fact
+  relevant:
+    - {qid: Q49079720, name: "Lăng Kiến Phúc"}
+  answer_keywords: ["8 tháng"]
+  source_chunk: "3711951-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q108
+  query: "Lăng của vị vua ở ngôi 8 tháng, nằm ngay trong khuôn viên lăng Tự Đức"
+  type: paraphrase
+  relevant:
+    - {qid: Q49079720, name: "Lăng Kiến Phúc"}
+  source_chunk: "3711951-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q109
+  query: "Lăng Minh Mạng cách trung tâm Huế bao xa?"
+  type: fact
+  relevant:
+    - {qid: Q7481070, name: "Lăng Minh Mạng"}
+  answer_keywords: ["12 km"]
+  source_chunk: "98207-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q110
+  query: "Xây lăng Minh Mạng huy động bao nhiêu thợ và lính?"
+  type: fact
+  relevant:
+    - {qid: Q7481070, name: "Lăng Minh Mạng"}
+  answer_keywords: ["mười nghìn"]
+  source_chunk: "98207-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q111
+  query: "Lăng Thiệu Trị quay mặt về hướng nào?"
+  type: fact
+  relevant:
+    - {qid: Q16511573, name: "Lăng Thiệu Trị"}
+  answer_keywords: ["tây bắc"]
+  source_chunk: "217457-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q112
+  query: "Tên chữ của lăng Thiệu Trị là gì?"
+  type: fact
+  relevant:
+    - {qid: Q16511573, name: "Lăng Thiệu Trị"}
+  answer_keywords: ["Xương Lăng"]
+  source_chunk: "217457-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q113
+  query: "Cuộc nổi dậy của dân phu khi xây lăng Tự Đức gọi là gì?"
+  type: fact
+  relevant:
+    - {qid: Q7481171, name: "Lăng Tự Đức"}
+  answer_keywords: ["Chày Vôi"]
+  source_chunk: "32335-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q114
+  query: "Tên chữ của lăng Đồng Khánh là gì?"
+  type: fact
+  relevant:
+    - {qid: Q10788196, name: "Lăng Đồng Khánh"}
+  answer_keywords: ["Tư Lăng"]
+  source_chunk: "214618-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q115
+  query: "Ba vị vua con của Kiên Thái Vương Nguyễn Phúc Hồng Cai là ai?"
+  type: fact
+  relevant:
+    - {qid: Q10788196, name: "Lăng Đồng Khánh"}
+  answer_keywords: ["Kiến Phúc", "Hàm Nghi", "Đồng Khánh"]
+  source_chunk: "214618-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q116
+  query: "Lầu Tứ Phương Vô Sự khánh thành năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q10788495, name: "Lầu Tứ Phương Vô Sự"}
+  answer_keywords: ["1923"]
+  source_chunk: "314440-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q117
+  query: "Lầu Tứ Phương Vô Sự rộng bao nhiêu mét vuông?"
+  type: fact
+  relevant:
+    - {qid: Q10788495, name: "Lầu Tứ Phương Vô Sự"}
+  answer_keywords: ["182m²"]
+  source_chunk: "314440-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q118
+  query: "Lầu hai tầng trong Hoàng thành nơi các hoàng tử, công chúa học hằng ngày cuối triều Nguyễn"
+  type: paraphrase
+  relevant:
+    - {qid: Q10788495, name: "Lầu Tứ Phương Vô Sự"}
+  source_chunk: "314440-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q119
+  query: "Nghênh Lương tạ được xây dưới triều vua nào?"
+  type: fact
+  relevant:
+    - {qid: Q10798712, name: "Nghênh Lương đình"}
+  answer_keywords: ["Tự Đức"]
+  source_chunk: "229022-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q120
+  query: "Nơi vua nghỉ chân trước khi xuống bến lên thuyền rồng, trên trục Kỳ đài ra Phu Văn Lâu"
+  type: paraphrase
+  relevant:
+    - {qid: Q10798712, name: "Nghênh Lương đình"}
+  source_chunk: "229022-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q121
+  query: "Ngọ Môn được xây năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q7023311, name: "Ngọ Môn (Hoàng thành Huế)"}
+  answer_keywords: ["1833"]
+  source_chunk: "201788-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q122
+  query: "Ngọ Môn có mấy lối đi xuyên qua thân đài?"
+  type: fact
+  relevant:
+    - {qid: Q7023311, name: "Ngọ Môn (Hoàng thành Huế)"}
+  answer_keywords: ["năm lối đi"]
+  source_chunk: "201788-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q123
+  query: "Vua Bảo Đại đọc chiếu thoái vị tại Ngọ Môn vào ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q7023311, name: "Ngọ Môn (Hoàng thành Huế)"}
+  answer_keywords: ["30 tháng 8 năm 1945"]
+  source_chunk: "201788-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q124
+  query: "Nhà Lê trung hưng kéo dài bao nhiêu năm?"
+  type: fact
+  relevant:
+    - {qid: Q10800791, name: "Nhà Lê trung hưng"}
+  answer_keywords: ["256 năm"]
+  source_chunk: "1201463-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q125
+  query: "Mạc Đăng Dung ép vua nào nhường ngôi năm 1527?"
+  type: fact
+  relevant:
+    - {qid: Q1317991, name: "Nhà Mạc"}
+  answer_keywords: ["Lê Cung Hoàng"]
+  source_chunk: "35415-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q126
+  query: "Nhà hát Sông Hương thuộc đơn vị nào quản lý?"
+  type: fact
+  relevant:
+    - {qid: Q99472085, name: "Nhà hát Sông Hương"}
+  answer_keywords: ["Học viện Âm nhạc Huế"]
+  source_chunk: "19494211-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q127
+  query: "Nhà hát Sông Hương chính thức hoạt động từ năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q99472085, name: "Nhà hát Sông Hương"}
+  answer_keywords: ["2020"]
+  source_chunk: "19494211-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q128
+  query: "Ba vị thừa sai đầu tiên lập Dòng Chúa Cứu Thế Việt Nam đến từ nước nào?"
+  type: fact
+  relevant:
+    - {qid: Q10800885, name: "Nhà thờ Dòng Chúa Cứu Thế, Huế"}
+  answer_keywords: ["Canada"]
+  source_chunk: "270361-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q129
+  query: "Kiến trúc sư nào thiết kế nhà thờ chính tòa Phủ Cam ngày nay?"
+  type: fact
+  relevant:
+    - {qid: Q28197251, name: "Nhà thờ chính tòa Phủ Cam"}
+  answer_keywords: ["Ngô Viết Thụ"]
+  source_chunk: "267218-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q130
+  query: "Nhà thờ chính tòa Phủ Cam nằm trên đồi nào?"
+  type: fact
+  relevant:
+    - {qid: Q28197251, name: "Nhà thờ chính tòa Phủ Cam"}
+  answer_keywords: ["Phước Quả"]
+  source_chunk: "267218-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q131
+  query: "Rú Chá là loại rừng gì và nằm ven đâu?"
+  type: fact
+  relevant:
+    - {qid: Q32225383, name: "Rú Chá"}
+  answer_keywords: ["ngập mặn", "phá Tam Giang"]
+  source_chunk: "19761922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q132
+  query: "Khu rừng ngập mặn ở Huế mang tên một loài cây mọc tự nhiên ở đó"
+  type: paraphrase
+  relevant:
+    - {qid: Q32225383, name: "Rú Chá"}
+  source_chunk: "19761922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q133
+  query: "Sân bay Tây Lộc được người Pháp xây vào thời gian nào?"
+  type: fact
+  relevant:
+    - {qid: Q18737233, name: "Sân bay Tây Lộc"}
+  answer_keywords: ["thập niên 1930"]
+  source_chunk: "19949821-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q134
+  query: "Sân vận động Tự Do có sức chứa bao nhiêu chỗ?"
+  type: fact
+  relevant:
+    - {qid: Q5929707, name: "Sân vận động Tự Do"}
+  answer_keywords: ["16.000"]
+  source_chunk: "76764-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q135
+  query: "Tên ban đầu của sân vận động Tự Do là gì?"
+  type: fact
+  relevant:
+    - {qid: Q5929707, name: "Sân vận động Tự Do"}
+  answer_keywords: ["Olympic Huế"]
+  source_chunk: "76764-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q136
+  query: "Vì sao sông Bồ có tên như vậy?"
+  type: fact
+  relevant:
+    - {qid: Q10822766, name: "Sông Bồ"}
+  answer_keywords: ["xương bồ"]
+  source_chunk: "113139-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q137
+  query: "Sông Bồ đổ vào sông Hương ở đâu?"
+  type: fact
+  relevant:
+    - {qid: Q10822766, name: "Sông Bồ"}
+  answer_keywords: ["ngã ba Sình"]
+  source_chunk: "113139-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q138
+  query: "Nhánh Tả Trạch của sông Hương dài khoảng bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q1515971, name: "Sông Hương"}
+  answer_keywords: ["67 km"]
+  source_chunk: "37327-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q139
+  query: "Từ ngã ba Tuần đến cửa Thuận An, sông Hương dài bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q1515971, name: "Sông Hương"}
+  answer_keywords: ["33 km"]
+  source_chunk: "37327-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q140
+  query: "Sông Hữu Trạch dài khoảng bao nhiêu km?"
+  type: fact
+  relevant:
+    - {qid: Q10822856, name: "Sông Hữu Trạch"}
+  answer_keywords: ["50 km"]
+  source_chunk: "305662-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q141
+  query: "Thủy điện Tả Trạch có công suất lắp máy bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q10822999, name: "Sông Tả Trạch"}
+  answer_keywords: ["21 MW"]
+  source_chunk: "305661-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q142
+  query: "Thái Tổ miếu thờ từ chúa nào đến chúa nào?"
+  type: fact
+  relevant:
+    - {qid: Q10825789, name: "Thái Tổ miếu (Hoàng thành Huế)"}
+  answer_keywords: ["Nguyễn Hoàng", "Nguyễn Phúc Thuần"]
+  source_chunk: "202232-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q143
+  query: "Chính đường Thái Miếu có bao nhiêu gian?"
+  type: fact
+  relevant:
+    - {qid: Q10825789, name: "Thái Tổ miếu (Hoàng thành Huế)"}
+  answer_keywords: ["13 gian"]
+  source_chunk: "202232-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q144
+  query: "Thế Tổ miếu được xây trong những năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q3211275, name: "Thế Tổ miếu (Hoàng thành Huế)"}
+  answer_keywords: ["1821-1822"]
+  source_chunk: "202230-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q145
+  query: "Nguyễn Kim bị ai đầu độc chết?"
+  type: fact
+  relevant:
+    - {qid: Q10828164, name: "Triệu Tổ miếu (Hoàng thành Huế)"}
+  answer_keywords: ["Dương Chấp Nhất"]
+  source_chunk: "201954-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q146
+  query: "Trường Đại học Ngoại ngữ Huế thành lập ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q10829097, name: "Trường Đại học Ngoại ngữ, Đại học Huế"}
+  answer_keywords: ["13 tháng 7 năm 2004"]
+  source_chunk: "86867-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q147
+  query: "Trường Đại học Phú Xuân được thành lập năm nào?"
+  type: fact
+  relevant:
+    - {qid: Q16481063, name: "Trường Đại học Phú Xuân"}
+  answer_keywords: ["2003"]
+  source_chunk: "272580-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q148
+  query: "Từ năm 2018 Đại học Phú Xuân là thành viên của tập đoàn nào?"
+  type: fact
+  relevant:
+    - {qid: Q16481063, name: "Trường Đại học Phú Xuân"}
+  answer_keywords: ["EQuest"]
+  source_chunk: "272580-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q149
+  query: "Trên Trấn Hải thành có bao nhiêu ụ súng đại bác?"
+  type: fact
+  relevant:
+    - {qid: Q10829227, name: "Trấn Hải thành"}
+  answer_keywords: ["99"]
+  source_chunk: "231248-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q150
+  query: "Trấn Hải thành do vua nào cho xây?"
+  type: fact
+  relevant:
+    - {qid: Q10829227, name: "Trấn Hải thành"}
+  answer_keywords: ["Gia Long"]
+  source_chunk: "231248-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q151
+  query: "Trận Mậu Thân tại Huế kéo dài bao nhiêu ngày?"
+  type: fact
+  relevant:
+    - {qid: Q697053, name: "Trận Mậu Thân tại Huế"}
+  answer_keywords: ["26 ngày"]
+  source_chunk: "188904-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q152
+  query: "Văn Miếu Huế được xây năm nào, dưới triều vua nào?"
+  type: fact
+  relevant:
+    - {qid: Q10833485, name: "Văn miếu (Huế)"}
+  answer_keywords: ["1808", "Gia Long"]
+  source_chunk: "230180-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q153
+  query: "Ngôi miếu cũ được giữ lại làm Khải Thánh Từ thờ cha mẹ Khổng Tử"
+  type: paraphrase
+  relevant:
+    - {qid: Q10833485, name: "Văn miếu (Huế)"}
+  source_chunk: "230180-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q154
+  query: "Vụ tấn công hóa học tại Huế diễn ra ngày nào?"
+  type: fact
+  relevant:
+    - {qid: Q5951632, name: "Vụ tấn công hóa học tại Huế"}
+  answer_keywords: ["3 tháng 6 năm 1963"]
+  source_chunk: "325385-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q155
+  query: "Bao nhiêu người phải nhập viện trong vụ tấn công hóa học tại Huế năm 1963?"
+  type: fact
+  relevant:
+    - {qid: Q5951632, name: "Vụ tấn công hóa học tại Huế"}
+  answer_keywords: ["67 người"]
+  source_chunk: "325385-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q156
+  query: "Thi hài vua Thiệu Trị được quàn ở điện Long An bao lâu?"
+  type: fact
+  relevant:
+    - {qid: Q10840231, name: "Điện Long An"}
+  answer_keywords: ["tám tháng"]
+  source_chunk: "231268-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q157
+  query: "Cầu nào bắc qua hồ Thái Dịch trên đường từ Ngọ Môn vào điện Thái Hòa?"
+  type: fact
+  relevant:
+    - {qid: Q6826745, name: "Điện Thái Hòa (Hoàng thành Huế)"}
+  answer_keywords: ["Trung Đạo"]
+  source_chunk: "201789-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q158
+  query: "Điện Thái Hòa được dùng để làm gì?"
+  type: descriptive
+  relevant:
+    - {qid: Q6826745, name: "Điện Thái Hòa (Hoàng thành Huế)"}
+  answer_keywords: ["thiết triều"]
+  source_chunk: "201789-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q159
+  query: "Giao đàn của đàn Nam Giao gồm mấy tầng?"
+  type: fact
+  relevant:
+    - {qid: Q10840433, name: "Đàn Nam Giao (triều Nguyễn)"}
+  answer_keywords: ["3 tầng"]
+  source_chunk: "35880-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q160
+  query: "Khuôn viên đàn Nam Giao rộng bao nhiêu?"
+  type: fact
+  relevant:
+    - {qid: Q10840433, name: "Đàn Nam Giao (triều Nguyễn)"}
+  answer_keywords: ["10ha"]
+  source_chunk: "35880-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q161
+  query: "Đập Thảo Long dài bao nhiêu mét?"
+  type: fact
+  relevant:
+    - {qid: Q10830372, name: "Đập Thảo Long"}
+  answer_keywords: ["571,25 m"]
+  source_chunk: "19513847-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q162
+  query: "Đập ngăn mặn lớn nhất Đông Nam Á ở hạ lưu sông Hương"
+  type: paraphrase
+  relevant:
+    - {qid: Q10830372, name: "Đập Thảo Long"}
+  source_chunk: "19513847-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q163
+  query: "Đế quốc Việt Nam tồn tại trong bao lâu?"
+  type: fact
+  relevant:
+    - {qid: Q701337, name: "Đế quốc Việt Nam"}
+  answer_keywords: ["5 tháng"]
+  source_chunk: "38838-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q164
+  query: "Ai làm Tổng trưởng nội các Đế quốc Việt Nam?"
+  type: fact
+  relevant:
+    - {qid: Q701337, name: "Đế quốc Việt Nam"}
+  answer_keywords: ["Trần Trọng Kim"]
+  source_chunk: "38838-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q165
+  query: "chua thien mu nam tren doi nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q975568, name: "Chùa Thiên Mụ"}
+  answer_keywords: ["Hà Khê"]
+  source_chunk: "24101-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q166
+  query: "cho dong ba o duong nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q97273263, name: "Chợ Đông Ba"}
+  answer_keywords: ["Trần Hưng Đạo"]
+  source_chunk: "19356227-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q167
+  query: "ga hue xay nam nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q994118, name: "Ga Huế"}
+  answer_keywords: ["1908"]
+  source_chunk: "3704998-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q168
+  query: "cau truong tien dai bao nhieu met"
+  type: no_diacritics
+  relevant:
+    - {qid: Q10752407, name: "Cầu Trường Tiền"}
+  answer_keywords: ["402,60"]
+  source_chunk: "36349-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q169
+  query: "lang khai dinh nam o nui nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q7818621, name: "Lăng Khải Định"}
+  answer_keywords: ["Châu Chữ"]
+  source_chunk: "202284-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q170
+  query: "cuu dinh dat o dau"
+  type: no_diacritics
+  relevant:
+    - {qid: Q10752805, name: "Cửu Đỉnh (nhà Nguyễn)"}
+  answer_keywords: ["Thế miếu"]
+  source_chunk: "141105-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q171
+  query: "ngo mon xay nam nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q7023311, name: "Ngọ Môn (Hoàng thành Huế)"}
+  answer_keywords: ["1833"]
+  source_chunk: "201788-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q172
+  query: "dan nam giao co may tang"
+  type: no_diacritics
+  relevant:
+    - {qid: Q10840433, name: "Đàn Nam Giao (triều Nguyễn)"}
+  answer_keywords: ["3 tầng"]
+  source_chunk: "35880-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q173
+  query: "san van dong tu do chua duoc bao nhieu nguoi"
+  type: no_diacritics
+  relevant:
+    - {qid: Q5929707, name: "Sân vận động Tự Do"}
+  answer_keywords: ["16.000"]
+  source_chunk: "76764-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q174
+  query: "khach san morin o hue co tu nam nao"
+  type: no_diacritics
+  relevant:
+    - {qid: Q106196496, name: "Khách sạn Saigon Morin"}
+  answer_keywords: ["1901"]
+  source_chunk: "19567922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q175
+  query: "song huong tu nga ba tuan ra bien dai bao nhieu"
+  type: no_diacritics
+  relevant:
+    - {qid: Q1515971, name: "Sông Hương"}
+  answer_keywords: ["33 km"]
+  source_chunk: "37327-1"
+  author: claude-draft
+  reviewed: true
+
+- id: q176
+  query: "nha tho phu cam do ai thiet ke"
+  type: no_diacritics
+  relevant:
+    - {qid: Q28197251, name: "Nhà thờ chính tòa Phủ Cam"}
+  answer_keywords: ["Ngô Viết Thụ"]
+  source_chunk: "267218-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q177
+  query: "cong vien nuoc bo hoang o hue"
+  type: no_diacritics
+  relevant:
+    - {qid: Q115525590, name: "Công viên nước Hồ Thủy Tiên"}
+  source_chunk: "19768020-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q178
+  query: "ru cha o dau"
+  type: no_diacritics
+  relevant:
+    - {qid: Q32225383, name: "Rú Chá"}
+  answer_keywords: ["phá Tam Giang"]
+  source_chunk: "19761922-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q179
+  query: "lau tu phuong vo su dung de lam gi"
+  type: no_diacritics
+  relevant:
+    - {qid: Q10788495, name: "Lầu Tứ Phương Vô Sự"}
+  source_chunk: "314440-0"
+  author: claude-draft
+  reviewed: true
+
+- id: q180
+  query: "Những cây cầu bắc qua phá Tam Giang"
+  type: multi
+  relevant:
+    - {qid: Q10740295, name: "Cầu Tam Giang"}
+    - {qid: Q16480564, name: "Cầu Thuận An"}
+  author: claude-draft
+  reviewed: true
+
+- id: q181
+  query: "Các nhà ga đường sắt Bắc Nam trong thành phố Huế"
+  type: multi
+  relevant:
+    - {qid: Q994118, name: "Ga Huế"}
+    - {qid: Q60363499, name: "Ga Hương Thủy"}
+    - {qid: Q60364455, name: "Ga Văn Xá"}
+    - {qid: Q130514609, name: "Ga An Cựu"}
+  author: claude-draft
+  reviewed: true
+
+- id: q182
+  query: "Hai nhánh sông hợp lại thành sông Hương"
+  type: multi
+  relevant:
+    - {qid: Q10822856, name: "Sông Hữu Trạch"}
+    - {qid: Q10822999, name: "Sông Tả Trạch"}
+    - {qid: Q1515971, name: "Sông Hương"}
+  author: claude-draft
+  reviewed: true
+
+- id: q183
+  query: "Các ngôi quốc tự của nhà Nguyễn còn tồn tại ở Huế"
+  type: multi
+  relevant:
+    - {qid: Q5275217, name: "Chùa Diệu Đế"}
+    - {qid: Q975568, name: "Chùa Thiên Mụ"}
+  author: claude-draft
+  reviewed: true
+
+- id: q184
+  query: "Các miếu thờ tổ tiên nhà Nguyễn trong Hoàng thành Huế"
+  type: multi
+  relevant:
+    - {qid: Q10825789, name: "Thái Tổ miếu (Hoàng thành Huế)"}
+    - {qid: Q3211275, name: "Thế Tổ miếu (Hoàng thành Huế)"}
+    - {qid: Q10828164, name: "Triệu Tổ miếu (Hoàng thành Huế)"}
+  author: claude-draft
+  reviewed: true
+
+- id: q185
+  query: "Những lăng vua nằm ở phường Thủy Xuân"
+  type: multi
+  relevant:
+    - {qid: Q7818621, name: "Lăng Khải Định"}
+    - {qid: Q7481171, name: "Lăng Tự Đức"}
+    - {qid: Q10788196, name: "Lăng Đồng Khánh"}
+    - {qid: Q49079720, name: "Lăng Kiến Phúc"}
+  author: claude-draft
+  reviewed: true
+
+- id: q186
+  query: "Các cây cầu bắc qua sông Hương ở Huế"
+  type: multi
+  relevant:
+    - {qid: Q10752407, name: "Cầu Trường Tiền"}
+    - {qid: Q10752393, name: "Cầu Phú Xuân"}
+    - {qid: Q10752420, name: "Cầu Dã Viên"}
+    - {qid: Q10740293, name: "Cầu Chợ Dinh"}
+    - {qid: Q32581061, name: "Cầu Nguyễn Hoàng"}
+    - {qid: Q31993740, name: "Cầu Tuần"}
+  author: claude-draft
+  reviewed: true
+
+- id: q187
+  query: "Các sự kiện Phật tử phản kháng chính quyền tại Huế"
+  type: multi
+  relevant:
+    - {qid: Q126703743, name: "Biểu tình Phật giáo tại Huế 1993"}
+    - {qid: Q5951632, name: "Vụ tấn công hóa học tại Huế"}
+  author: claude-draft
+  reviewed: true
+
+- id: q188
+  query: "Công trình phòng thủ ở cửa biển Thuận An thời Nguyễn"
+  type: multi
+  relevant:
+    - {qid: Q10829227, name: "Trấn Hải thành"}
+    - {qid: Q10752775, name: "Cửa Thuận An"}
+  author: claude-draft
+  reviewed: true
+
+- id: q189
+  query: "Các trường đại học ở Huế"
+  type: multi
+  relevant:
+    - {qid: Q10829097, name: "Trường Đại học Ngoại ngữ, Đại học Huế"}
+    - {qid: Q16481063, name: "Trường Đại học Phú Xuân"}
+  author: claude-draft
+  reviewed: true
